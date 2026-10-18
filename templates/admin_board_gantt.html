@@ -1,0 +1,213 @@
+<link rel="stylesheet" href="/static/melodi_project/css/kanban.css">
+<link rel="stylesheet" href="/static/melodi_project/css/gantt.css">
+
+<div class="kanban-workspace">
+  <!-- Gantt Top Toolbar -->
+  <div class="kanban-toolbar">
+    <div class="ds-flex ds-items-center ds-gap-3">
+      <a href="/admin/melodi_project" class="ds-btn ds-btn-subtle ds-btn-sm">
+        ← {{ t('filter_all', 'Tableaux') }}
+      </a>
+      <div class="ds-flex ds-items-center ds-gap-2">
+        <span style="display: inline-block; width: 14px; height: 14px; border-radius: 4px; background-color: {{ board.color }};"></span>
+        <h2 class="ds-text-lg ds-font-bold ds-text-primary" style="margin: 0;">{{ board.title }}</h2>
+      </div>
+
+      <!-- View Switcher -->
+      <div class="ds-flex ds-gap-1" style="background-color: var(--ds-color-surface-subtle); padding: 2px; border-radius: var(--ds-radius-md);">
+        <a href="/admin/melodi_project/board?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs">
+          📊 {{ t('kanban_view', 'Kanban') }}
+        </a>
+        <a href="/admin/melodi_project/board/scrum?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs">
+          🏃 {{ t('scrum_view', 'Scrum') }}
+        </a>
+        <span class="ds-btn ds-btn-primary ds-btn-xs">📅 {{ t('gantt_view', 'Gantt') }}</span>
+        <a href="/admin/melodi_project/board/table?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs">
+          📋 {{ t('table_view', 'Table') }}
+        </a>
+      </div>
+    </div>
+
+    <!-- Controls (Zoom, Dependencies, Legend) -->
+    <div class="ds-flex ds-items-center ds-gap-2">
+      <!-- Zoom -->
+      <div class="ds-flex ds-gap-1" style="background-color: var(--ds-color-surface-subtle); padding: 2px; border-radius: var(--ds-radius-md);">
+        <button type="button" id="gantt-zoom-day" class="ds-btn ds-btn-xs ds-btn-primary">Jour</button>
+        <button type="button" id="gantt-zoom-week" class="ds-btn ds-btn-xs ds-btn-subtle">Semaine</button>
+        <button type="button" id="gantt-zoom-month" class="ds-btn ds-btn-xs ds-btn-subtle">Mois</button>
+      </div>
+
+      <button type="button" class="ds-btn ds-btn-outline ds-btn-xs" onclick="document.getElementById('new-dep-modal').classList.add('is-open');">
+        🔗 {{ t('add_dependency', 'Lier deux tâches') }}
+      </button>
+
+      <!-- Legend -->
+      <div class="ds-flex ds-items-center ds-gap-3 ds-text-xs ds-text-muted ds-ml-2">
+        <span class="ds-flex ds-items-center ds-gap-1"><span style="display:inline-block; width:12px; height:12px; background:#f59e0b; transform:rotate(45deg);"></span> Jalon</span>
+        <span class="ds-flex ds-items-center ds-gap-1"><span style="display:inline-block; width:14px; height:8px; background:var(--ds-color-primary); border-radius:2px;"></span> Tâche</span>
+        <span class="ds-flex ds-items-center ds-gap-1"><span style="display:inline-block; width:14px; height:8px; background:#8b5cf6; border-radius:99px;"></span> Epic</span>
+        <span class="ds-flex ds-items-center ds-gap-1"><span style="display:inline-block; width:14px; height:8px; background:rgba(79,70,229,0.3); border:1px solid #4f46e5; border-radius:2px;"></span> Sprint</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gantt Chart Container -->
+  <div class="gantt-wrapper">
+    <div class="gantt-layout">
+      <!-- Left Tree Grid -->
+      <div class="gantt-grid" id="gantt-grid">
+        <div class="gantt-grid-header">
+          <div style="flex: 2; padding-left: var(--ds-space-3);">TÂCHE / ÉLÉMENT</div>
+          <div style="flex: 1; text-align: center;">DÉBUT</div>
+          <div style="flex: 1; text-align: center;">FIN</div>
+          <div style="width: 50px; text-align: right; padding-right: var(--ds-space-2);">DURÉE</div>
+        </div>
+        <div id="gantt-grid-rows"></div>
+      </div>
+
+      <!-- Right Timeline Canvas -->
+      <div class="gantt-timeline-container" id="gantt-timeline-container">
+        <div class="gantt-timeline-header" id="gantt-timeline-header"></div>
+        <div class="gantt-body-canvas" id="gantt-body-canvas">
+          <!-- Background Grid Lines -->
+          <div id="gantt-grid-lines"></div>
+          <!-- Task & Sprint Bars -->
+          <div id="gantt-bars-container"></div>
+          <!-- SVG Dependency Overlay -->
+          <svg class="gantt-svg-overlay" id="gantt-svg-overlay"></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nouvelle Dépendance -->
+<div id="new-dep-modal" class="card-modal-backdrop">
+  <div class="card-modal-container" style="max-width: 480px;">
+    <div class="card-modal-header">
+      <h3 class="ds-text-base ds-font-bold ds-text-primary" style="margin: 0;">{{ t('new_dependency_title', 'Créer une dépendance') }}</h3>
+      <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm" onclick="document.getElementById('new-dep-modal').classList.remove('is-open');">✕</button>
+    </div>
+    <form id="create-dep-form" class="ds-p-4">
+      <input type="hidden" name="board_id" value="{{ board.id }}">
+      <div class="ds-mb-3">
+        <label class="ds-label ds-text-xs ds-font-bold">{{ t('predecessor', 'Tâche Antérieure (Prédécesseur)') }}</label>
+        <select name="predecessor_id" class="ds-select" required id="dep-pred-select"></select>
+      </div>
+      <div class="ds-mb-3">
+        <label class="ds-label ds-text-xs ds-font-bold">{{ t('successor', 'Tâche Dépendante (Successeur)') }}</label>
+        <select name="successor_id" class="ds-select" required id="dep-succ-select"></select>
+      </div>
+      <div class="ds-grid ds-grid-cols-2 ds-gap-3 ds-mb-4">
+        <div>
+          <label class="ds-label ds-text-xs ds-font-bold">{{ t('link_type', 'Type de relation') }}</label>
+          <select name="dependency_type" class="ds-select">
+            <option value="FS">Fin-à-Début (FS)</option>
+            <option value="SS">Début-à-Début (SS)</option>
+            <option value="FF">Fin-à-Fin (FF)</option>
+            <option value="SF">Début-à-Fin (SF)</option>
+          </select>
+        </div>
+        <div>
+          <label class="ds-label ds-text-xs ds-font-bold">{{ t('lag_days', 'Décalage (jours)') }}</label>
+          <input type="number" name="lag_days" class="ds-input" value="0" step="0.5">
+        </div>
+      </div>
+      <div class="ds-flex ds-justify-end ds-gap-2">
+        <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm" onclick="document.getElementById('new-dep-modal').classList.remove('is-open');">{{ t('cancel', 'Annuler') }}</button>
+        <button type="submit" class="ds-btn ds-btn-primary ds-btn-sm">{{ t('save', 'Créer le lien') }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal de détail de carte Trello-Style -->
+<div id="card-detail-modal" class="card-modal-backdrop">
+  <div class="card-modal-container">
+    <div class="card-modal-header">
+      <div style="flex: 1;">
+        <div class="ds-flex ds-items-center ds-gap-2 ds-mb-1">
+          <span id="modal-card-priority" class="ds-badge ds-badge-primary">NORMAL</span>
+          <span class="ds-text-xs ds-text-muted">Échéance: <strong id="modal-card-due-date">-</strong></span>
+        </div>
+        <h3 id="modal-card-title" class="ds-text-lg ds-font-bold ds-text-primary" style="margin: 0;"></h3>
+      </div>
+      <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm js-close-modal" title="{{ t('close', 'Fermer') }}">✕</button>
+    </div>
+
+    <div class="card-modal-body">
+      <!-- Main Column -->
+      <div>
+        <!-- Scrum & Gantt Context Row -->
+        <div class="ds-flex ds-items-center ds-gap-2 ds-mb-3 ds-p-2 ds-border ds-rounded-md" style="background-color: var(--ds-color-surface-subtle); font-size: 0.8rem;">
+          <span id="modal-card-sprint-badge" class="ds-badge ds-badge-subtle">🏃 Backlog</span>
+          <span id="modal-card-epic-badge" class="ds-badge ds-badge-subtle" style="display: none;"></span>
+          <span id="modal-card-sp-badge" class="ds-badge ds-badge-secondary" style="display: none;"></span>
+          <span id="modal-card-milestone-badge" class="ds-badge ds-badge-warning" style="display: none;">🔶 Jalon</span>
+          <span class="ds-text-muted" style="margin-left: auto;">Avancement: <strong id="modal-card-progress">0%</strong></span>
+        </div>
+
+        <!-- Labels & Members Quick summary -->
+        <div class="ds-flex ds-gap-4 ds-mb-4 ds-flex-wrap">
+          <div style="flex: 1;">
+            <div class="card-modal-section-title">{{ t('labels', 'Étiquettes') }}</div>
+            <div id="modal-card-labels" class="ds-flex ds-gap-1 ds-flex-wrap"></div>
+          </div>
+          <div style="flex: 1;">
+            <div class="card-modal-section-title">{{ t('members', 'Membres') }}</div>
+            <div id="modal-card-assignees" class="ds-flex ds-items-center"></div>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="ds-mb-6">
+          <div class="card-modal-section-title">
+            <span>📝</span> {{ t('board_description', 'Description') }}
+          </div>
+          <div id="modal-card-desc" class="ds-p-3 ds-border ds-rounded-md ds-text-sm" style="background-color: var(--ds-color-surface-subtle); white-space: pre-wrap; min-height: 60px;"></div>
+        </div>
+
+        <!-- Checklists Container -->
+        <div class="ds-mb-6">
+          <div id="modal-checklists-container"></div>
+        </div>
+
+        <!-- Comments & Activity -->
+        <div class="ds-mb-4">
+          <div class="card-modal-section-title">
+            <span>💬</span> {{ t('comments', 'Commentaires') }}
+          </div>
+          <form id="modal-comment-form" class="ds-mb-3">
+            <textarea class="ds-textarea ds-mb-2" rows="2" placeholder="{{ t('add_comment', 'Écrire un commentaire...') }}" required style="width: 100%;"></textarea>
+            <button type="submit" class="ds-btn ds-btn-primary ds-btn-sm">{{ t('post_comment', 'Envoyer') }}</button>
+          </form>
+          <div id="modal-comments-list"></div>
+        </div>
+      </div>
+
+      <!-- Sidebar Actions Column -->
+      <div style="border-left: 1px solid var(--ds-color-border-subtle); padding-left: var(--ds-space-4);">
+        <div class="ds-text-xs ds-font-bold ds-text-muted ds-mb-2" style="text-transform: uppercase;">{{ t('actions', 'Actions') }}</div>
+        <div class="ds-flex ds-flex-col ds-gap-2">
+          <button type="button" id="js-toggle-complete-card" class="ds-btn ds-btn-outline ds-btn-sm" style="width: 100%; justify-content: flex-start;">
+            ✓ {{ t('mark_completed', 'Terminer / Rouvrir') }}
+          </button>
+          <button type="button" id="js-add-checklist-trigger" class="ds-btn ds-btn-outline ds-btn-sm" style="width: 100%; justify-content: flex-start;">
+            ☑ {{ t('add_checklist', 'Ajouter une checklist') }}
+          </button>
+          <button type="button" id="js-delete-card-trigger" class="ds-btn ds-btn-danger ds-btn-sm" style="width: 100%; justify-content: flex-start; margin-top: var(--ds-space-4);">
+            🗑 {{ t('delete', 'Supprimer la carte') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/melodi_project/js/card_modal.js"></script>
+<script src="/static/melodi_project/js/gantt.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    window.initGanttChart("{{ board.id }}");
+  });
+</script>

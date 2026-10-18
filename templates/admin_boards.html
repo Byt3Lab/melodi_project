@@ -1,0 +1,426 @@
+<link rel="stylesheet" href="/static/melodi_project/css/kanban.css">
+
+<div class="ds-container ds-py-6">
+  <!-- Hero Section -->
+  <div class="project-hero ds-flex ds-items-center ds-justify-between ds-flex-wrap ds-gap-4">
+    <div>
+      <span class="project-badge-pill">
+        <span class="project-pulse-dot"></span>
+        {{ t('badge_agile_management', 'Gestion de Projets & Méthodologies Agiles') }}
+      </span>
+      <h1 class="ds-text-2xl ds-font-bold ds-text-primary" style="margin: 0.25rem 0;">{{ t('projects_title', 'Gestion de Projets & Kanban') }}</h1>
+      <p class="ds-text-sm ds-text-secondary" style="margin: 0; max-width: 650px;">
+        {{ t('projects_subtitle', 'Organisez vos équipes, vos tâches et vos flux de travail visuels inspirés de Trello, Scrum et Gantt.') }}
+      </p>
+    </div>
+    <div>
+      <button type="button" class="ds-btn ds-btn-primary" style="padding: 0.65rem 1.25rem; font-size: 0.875rem; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);" onclick="document.getElementById('new-board-modal').classList.add('is-open');">
+        + {{ t('new_board', 'Nouveau Tableau') }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Global KPI Stat Cards -->
+  <div class="project-stats-grid">
+    <div class="project-stat-card">
+      <div>
+        <div class="ds-text-xs ds-text-secondary ds-font-medium">{{ t('total_boards', 'Tableaux Actifs') }}</div>
+        <div class="ds-text-2xl ds-font-bold ds-text-primary ds-mt-1">{{ stats.total_boards }}</div>
+      </div>
+      <div class="project-stat-icon-wrap project-stat-icon-primary">
+        📁
+      </div>
+    </div>
+    <div class="project-stat-card">
+      <div>
+        <div class="ds-text-xs ds-text-secondary ds-font-medium">{{ t('active_cards', 'Tâches en Cours') }}</div>
+        <div class="ds-text-2xl ds-font-bold ds-text-primary ds-mt-1">{{ stats.active_cards }}</div>
+      </div>
+      <div class="project-stat-icon-wrap project-stat-icon-info">
+        ⚡
+      </div>
+    </div>
+    <div class="project-stat-card">
+      <div>
+        <div class="ds-text-xs ds-text-secondary ds-font-medium">{{ t('overdue_cards', 'En Retard') }}</div>
+        <div class="ds-text-2xl ds-font-bold ds-text-danger ds-mt-1">{{ stats.overdue_cards }}</div>
+      </div>
+      <div class="project-stat-icon-wrap project-stat-icon-danger">
+        ⚠️
+      </div>
+    </div>
+    <div class="project-stat-card">
+      <div>
+        <div class="ds-text-xs ds-text-secondary ds-font-medium">{{ t('completed_cards', 'Tâches Terminées') }}</div>
+        <div class="ds-text-2xl ds-font-bold ds-text-success ds-mt-1">{{ stats.completed_cards }}</div>
+      </div>
+      <div class="project-stat-icon-wrap project-stat-icon-success">
+        ✅
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter & Search Toolbar -->
+  <div class="project-toolbar">
+    <div class="project-filter-pills">
+      <a href="/admin/melodi_project" class="project-pill-btn {% if filter_type == 'all' %}is-active{% endif %}">
+        {{ t('filter_all', 'Tous les Tableaux') }}
+        <span class="project-pill-badge">{{ boards|length }}</span>
+      </a>
+      <a href="/admin/melodi_project?filter=favorites" class="project-pill-btn {% if filter_type == 'favorites' %}is-active{% endif %}">
+        ⭐ {{ t('filter_favorites', 'Favoris') }}
+      </a>
+      <a href="/admin/melodi_project?filter=archived" class="project-pill-btn {% if filter_type == 'archived' %}is-active{% endif %}">
+        📁 {{ t('filter_archived', 'Archivés') }}
+      </a>
+    </div>
+
+    <div class="ds-flex ds-items-center ds-gap-2">
+      <div style="position: relative;">
+        <input type="text" id="board-search-input" name="q" value="{{ search_query }}" placeholder="{{ t('search_placeholder', 'Rechercher un tableau ou une tâche...') }}" class="ds-input ds-input-sm" style="width: 300px; padding-left: 2.25rem; height: 38px; border-radius: var(--ds-radius-md, 0.5rem);" onkeyup="filterBoardsClient(this.value)">
+        <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 0.875rem; opacity: 0.6; pointer-events: none;">🔍</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Boards Grid -->
+  {% if boards and boards|length > 0 %}
+    <div class="project-boards-grid" id="boards-grid-container">
+      {% for item in boards %}
+        {% set b = item.board %}
+        {% set summary = item.summary %}
+        <div class="project-board-card" data-title="{{ b.title|lower }}" data-desc="{{ (b.description or '')|lower }}" data-type="{{ b.project_type or 'hybrid' }}">
+          <!-- Colored Top Cover -->
+          <div class="project-board-card-cover" style="background-color: {{ b.color }};">
+            <form method="POST" action="/admin/melodi_project" style="margin: 0;">
+              <input type="hidden" name="action_type" value="toggle_favorite">
+              <input type="hidden" name="board_id" value="{{ b.id }}">
+              <button type="submit" class="project-board-fav-btn" title="{{ t('filter_favorites', 'Favori') }}">
+                {% if b.is_favorite %}⭐{% else %}<span style="opacity: 0.6;">☆</span>{% endif %}
+              </button>
+            </form>
+          </div>
+
+          <!-- Body -->
+          <div class="project-board-card-body">
+            <!-- Top Avatar & Chips Row -->
+            <div class="project-board-top-row">
+              <div class="project-board-icon-avatar" style="background-color: {{ b.color }};">
+                {{ b.icon or '📋' }}
+              </div>
+              <div class="project-chip-group">
+                <span class="project-methodology-chip methodology-hybrid">⚡ {{ t('project_type_hybrid', 'Hybride') }} (Kanban • Scrum • Gantt)</span>
+
+                <span class="project-vis-chip">
+                  {% if b.visibility.value == 'team' %}
+                    👥 {{ t('visibility_team', 'Équipe') }}
+                  {% elif b.visibility.value == 'private' %}
+                    🔒 {{ t('visibility_private', 'Privé') }}
+                  {% else %}
+                    🌐 {{ t('visibility_public', 'Public') }}
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+
+            <!-- Title & Description -->
+            <a href="/admin/melodi_project/board?id={{ b.id }}" class="project-board-card-title">
+              {{ b.title }}
+            </a>
+            <div class="project-board-card-desc">
+              {{ b.description or t('empty_boards_desc', 'Tableau de suivi et de gestion de projet.') }}
+            </div>
+
+            <!-- Active Sprint Indicator -->
+            {% if summary.active_sprint %}
+              <div class="project-active-sprint-chip">
+                <span class="project-pulse-dot"></span>
+                <span><strong>{{ t('active_sprint_badge', 'Sprint actif') }}:</strong> {{ summary.active_sprint.name }}</span>
+                <span style="margin-left: auto; font-weight: 600;">{{ summary.active_sprint.progress_percent }}%</span>
+              </div>
+            {% endif %}
+
+            <!-- Micro Metrics Row -->
+            <div class="project-board-meta-row">
+              <span class="project-board-meta-item">
+                <span>📋</span> {{ summary.total_lists }} {{ t('total_lists', 'colonnes') }}
+              </span>
+              <span class="project-board-meta-item">
+                <span>🏃</span> {{ summary.total_sprints }} {{ t('total_sprints', 'sprints') }}
+              </span>
+              <span class="project-board-meta-item">
+                <span>🚩</span> {{ summary.total_epics }} {{ t('total_epics', 'epics') }}
+              </span>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="project-board-card-progress">
+              <div class="ds-flex ds-justify-between ds-text-xs ds-text-secondary ds-mb-1">
+                <span>{{ t('progress_label', 'Progression') }}</span>
+                <strong>{{ summary.progress_percent }}% ({{ summary.completed_cards }}/{{ summary.total_cards }})</strong>
+              </div>
+              <div class="project-progress-track">
+                <div class="project-progress-fill" style="width: {{ summary.progress_percent }}%; background-color: {{ b.color }};"></div>
+              </div>
+            </div>
+
+            <!-- Footer: Stacked Members & Quick View Switchers -->
+            <div class="project-board-card-footer">
+              <div class="project-avatar-stack">
+                {% if summary.members and summary.members|length > 0 %}
+                  {% for m in summary.members[:4] %}
+                    <div class="project-avatar-bubble" title="{{ m }}">
+                      {{ m[:2]|upper }}
+                    </div>
+                  {% endfor %}
+                  {% if summary.members_count > 4 %}
+                    <div class="project-avatar-bubble" style="background: var(--ds-color-surface-subtle); color: var(--ds-color-text-secondary);">
+                      +{{ summary.members_count - 4 }}
+                    </div>
+                  {% endif %}
+                {% else %}
+                  <div class="project-avatar-bubble" style="background: var(--ds-color-surface-subtle); color: var(--ds-color-text-muted);" title="{{ t('all_members', 'Équipe') }}">
+                    👥
+                  </div>
+                {% endif %}
+              </div>
+
+              <!-- Quick View Links -->
+              <div class="project-view-buttons">
+                <a href="/admin/melodi_project/board?id={{ b.id }}" class="project-view-btn" title="{{ t('kanban_view', 'Vue Kanban') }}">
+                  📋 {{ t('open_kanban', 'Kanban') }}
+                </a>
+                <a href="/admin/melodi_project/board/scrum?id={{ b.id }}" class="project-view-btn" title="{{ t('scrum_view', 'Vue Scrum') }}">
+                  🏃 {{ t('open_scrum', 'Scrum') }}
+                </a>
+                <a href="/admin/melodi_project/board/gantt?id={{ b.id }}" class="project-view-btn" title="{{ t('gantt_view', 'Vue Gantt') }}">
+                  📅 {{ t('open_gantt', 'Gantt') }}
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- No Match State (for client filter) -->
+    <div id="no-match-alert" class="ds-card ds-p-8 ds-text-center" style="display: none; margin-top: 1rem;">
+      <div class="ds-text-3xl ds-mb-2">🔍</div>
+      <p class="ds-text-sm ds-text-secondary" style="margin: 0;">{{ t('no_boards_match', 'Aucun tableau ne correspond à votre recherche.') }}</p>
+    </div>
+  {% else %}
+    <!-- Empty State -->
+    <div class="ds-card ds-p-8 ds-text-center" style="border-radius: var(--ds-radius-xl, 1rem);">
+      <div class="ds-text-5xl ds-mb-3">📋</div>
+      <h3 class="ds-text-lg ds-font-bold ds-text-primary ds-mb-1">{{ t('empty_boards_title', 'Aucun tableau pour le moment') }}</h3>
+      <p class="ds-text-sm ds-text-secondary ds-mb-4" style="max-width: 480px; margin-left: auto; margin-right: auto;">
+        {{ t('empty_boards_desc', 'Créez votre premier projet pour commencer à organiser vos sprints Scrum, vos diagrammes de Gantt et vos tâches Kanban.') }}
+      </p>
+      <button type="button" class="ds-btn ds-btn-primary" style="box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);" onclick="document.getElementById('new-board-modal').classList.add('is-open');">
+        + {{ t('create_first_board', 'Créer un Tableau') }}
+      </button>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Modal Nouveau Tableau -->
+<div id="new-board-modal" class="card-modal-backdrop">
+  <div class="card-modal-container" style="max-width: 600px;">
+    <div class="card-modal-header">
+      <div class="ds-flex ds-items-center ds-gap-2">
+        <span class="ds-text-xl">✨</span>
+        <h3 class="ds-text-lg ds-font-bold ds-text-primary" style="margin: 0;">{{ t('new_board', 'Nouveau Tableau de Projet') }}</h3>
+      </div>
+      <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm" onclick="document.getElementById('new-board-modal').classList.remove('is-open');">✕</button>
+    </div>
+    <form method="POST" action="/admin/melodi_project">
+      <input type="hidden" name="action_type" value="create_board">
+      <div style="padding: 1.75rem 2rem; max-height: 72vh; overflow-y: auto;">
+        <!-- Unified All-in-One Methodology Banner -->
+        <div class="ds-p-4 ds-rounded-lg ds-mb-5" style="background-color: var(--ds-color-surface-subtle); border: 1px solid var(--ds-color-border-subtle);">
+          <div class="ds-flex ds-items-center ds-gap-2 ds-text-sm ds-font-bold ds-text-primary">
+            <span>⚡</span> {{ t('all_in_one_methodology', 'Projet Tout-en-Un (Kanban + Scrum + Gantt)') }}
+          </div>
+          <div class="ds-text-xs ds-text-secondary ds-mt-1">
+            {{ t('all_in_one_methodology_desc', 'Toutes les méthodologies interagissent ensemble nativement : flux continu Kanban, gestion par Sprints Scrum et vision macro Gantt.') }}
+          </div>
+        </div>
+        <input type="hidden" name="project_type" value="hybrid">
+
+        <!-- Board Title -->
+        <div class="ds-mb-4">
+          <label class="ds-label ds-mb-1 ds-font-medium">{{ t('board_title', 'Titre du tableau') }} *</label>
+          <input type="text" id="modal-board-title" name="title" required class="ds-input" placeholder="{{ t('board_title_placeholder', 'Ex: Refonte Plateforme Web, V2 Mobile...') }}" oninput="updateModalPreview()">
+        </div>
+
+        <!-- Description -->
+        <div class="ds-mb-4">
+          <label class="ds-label ds-mb-1 ds-font-medium">{{ t('board_description', 'Description') }}</label>
+          <textarea id="modal-board-desc" name="description" rows="2" class="ds-textarea" placeholder="{{ t('board_description_placeholder', 'Objectifs du projet, jalons clés...') }}" oninput="updateModalPreview()"></textarea>
+        </div>
+
+        <!-- Theme Color & Icon Selection -->
+        <div class="ds-grid ds-grid-cols-2 ds-gap-4 ds-mb-4">
+          <div>
+            <label class="ds-label ds-mb-1 ds-font-medium">{{ t('board_color', 'Couleur du thème') }}</label>
+            <div class="color-swatch-list">
+              <label class="color-swatch-option">
+                <input type="radio" name="color" value="#4F46E5" checked onchange="updateModalPreview()">
+                <span class="color-swatch-box" style="background: #4F46E5;"></span>
+              </label>
+              <label class="color-swatch-option">
+                <input type="radio" name="color" value="#0EA5E9" onchange="updateModalPreview()">
+                <span class="color-swatch-box" style="background: #0EA5E9;"></span>
+              </label>
+              <label class="color-swatch-option">
+                <input type="radio" name="color" value="#10B981" onchange="updateModalPreview()">
+                <span class="color-swatch-box" style="background: #10B981;"></span>
+              </label>
+              <label class="color-swatch-option">
+                <input type="radio" name="color" value="#F59E0B" onchange="updateModalPreview()">
+                <span class="color-swatch-box" style="background: #F59E0B;"></span>
+              </label>
+              <label class="color-swatch-option">
+                <input type="radio" name="color" value="#EF4444" onchange="updateModalPreview()">
+                <span class="color-swatch-box" style="background: #EF4444;"></span>
+              </label>
+              <label class="color-swatch-option">
+                <input type="radio" name="color" value="#8B5CF6" onchange="updateModalPreview()">
+                <span class="color-swatch-box" style="background: #8B5CF6;"></span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label class="ds-label ds-mb-1 ds-font-medium">{{ t('board_icon', 'Icône') }}</label>
+            <select id="modal-board-icon" name="icon" class="ds-select" onchange="updateModalPreview()">
+              <option value="🚀">🚀 Fusée / Lancement</option>
+              <option value="💻">💻 Développement Tech</option>
+              <option value="📱">📱 Application Mobile</option>
+              <option value="🎯">🎯 Objectif Stratégique</option>
+              <option value="💡">💡 Innovation / R&D</option>
+              <option value="🛠️">🛠️ Infrastructure / DevOps</option>
+              <option value="📊">📊 Gestion & Marketing</option>
+              <option value="🌐">🌐 Web & Réseau</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Visibility & Default View -->
+        <div class="ds-grid ds-grid-cols-2 ds-gap-4 ds-mb-4">
+          <div>
+            <label class="ds-label ds-mb-1 ds-font-medium">{{ t('board_visibility', 'Visibilité') }}</label>
+            <select name="visibility" class="ds-select">
+              <option value="team">{{ t('visibility_team', 'Équipe (Membres de l\'organisation)') }}</option>
+              <option value="private">{{ t('visibility_private', 'Privé') }}</option>
+              <option value="public">{{ t('visibility_public', 'Public') }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="ds-label ds-mb-1 ds-font-medium">{{ t('default_view', 'Vue par défaut') }}</label>
+            <select name="default_view" class="ds-select">
+              <option value="kanban">📋 {{ t('kanban_view', 'Tableau Kanban') }}</option>
+              <option value="scrum">🏃 {{ t('scrum_view', 'Vue Scrum & Backlog') }}</option>
+              <option value="gantt">📅 {{ t('gantt_view', 'Diagramme de Gantt') }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Favorite Checkbox -->
+        <div class="ds-mb-4">
+          <label class="ds-flex ds-items-center ds-gap-2 ds-text-sm" style="cursor: pointer;">
+            <input type="checkbox" name="is_favorite">
+            <span>⭐ {{ t('filter_favorites', 'Ajouter aux favoris') }}</span>
+          </label>
+        </div>
+
+        <!-- Live Preview Box -->
+        <div style="padding: 1.25rem 1.5rem; background: var(--ds-color-surface-subtle); border-radius: var(--ds-radius-lg, 0.75rem); border: 1px dashed var(--ds-color-border, #e2e8f0); margin-top: 1.25rem;">
+          <div class="ds-text-xs ds-text-secondary ds-font-medium ds-mb-2">👁️ {{ t('live_preview', 'Aperçu en direct') }}</div>
+          <div class="project-board-card" style="box-shadow: none;">
+            <div id="preview-cover" class="project-board-card-cover" style="height: 48px; background-color: #4F46E5;"></div>
+            <div class="project-board-card-body" style="padding: 1rem 1.25rem;">
+              <div class="project-board-top-row" style="margin-top: -24px;">
+                <div id="preview-icon-box" class="project-board-icon-avatar" style="width: 36px; height: 36px; font-size: 1rem; background-color: #4F46E5;">
+                  🚀
+                </div>
+                <div class="project-chip-group">
+                  <span id="preview-methodology-chip" class="project-methodology-chip methodology-hybrid">⚡ Hybride (Kanban • Scrum • Gantt)</span>
+                </div>
+              </div>
+              <div id="preview-title" class="project-board-card-title" style="font-size: 0.95rem;">
+                Titre du projet
+              </div>
+              <div id="preview-desc" class="project-board-card-desc" style="font-size: 0.78rem; margin-bottom: 0.5rem;">
+                Description du projet...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding: 1.25rem 2rem; background-color: var(--ds-color-surface-subtle); border-top: 1px solid var(--ds-color-border, #e2e8f0); border-bottom-left-radius: var(--ds-radius-xl, 1rem); border-bottom-right-radius: var(--ds-radius-xl, 1rem);" class="ds-flex ds-justify-end ds-gap-3">
+        <button type="button" class="ds-btn ds-btn-subtle" onclick="document.getElementById('new-board-modal').classList.remove('is-open');">
+          {{ t('cancel', 'Annuler') }}
+        </button>
+        <button type="submit" class="ds-btn ds-btn-primary" style="padding: 0.6rem 1.25rem; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);">
+          {{ t('create', 'Créer le Tableau') }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function filterBoardsClient(query) {
+  const q = (query || '').toLowerCase().trim();
+  const cards = document.querySelectorAll('#boards-grid-container .project-board-card');
+  let matchCount = 0;
+  cards.forEach(card => {
+    const title = card.getAttribute('data-title') || '';
+    const desc = card.getAttribute('data-desc') || '';
+    if (!q || title.includes(q) || desc.includes(q)) {
+      card.style.display = '';
+      matchCount++;
+    } else {
+      card.style.display = 'none';
+    }
+  });
+
+  const noMatchAlert = document.getElementById('no-match-alert');
+  if (noMatchAlert) {
+    noMatchAlert.style.display = (matchCount === 0 && cards.length > 0) ? 'block' : 'none';
+  }
+}
+
+function updateModalPreview() {
+  const titleInput = document.getElementById('modal-board-title');
+  const descInput = document.getElementById('modal-board-desc');
+  const iconSelect = document.getElementById('modal-board-icon');
+  const checkedColor = document.querySelector('input[name="color"]:checked');
+
+  const previewCover = document.getElementById('preview-cover');
+  const previewIconBox = document.getElementById('preview-icon-box');
+  const previewTitle = document.getElementById('preview-title');
+  const previewDesc = document.getElementById('preview-desc');
+  const previewMethodologyChip = document.getElementById('preview-methodology-chip');
+
+  const color = checkedColor ? checkedColor.value : '#4F46E5';
+  const title = (titleInput && titleInput.value.trim()) || 'Titre du projet';
+  const desc = (descInput && descInput.value.trim()) || 'Description du projet...';
+  const icon = (iconSelect && iconSelect.value) || '🚀';
+
+  if (previewCover) previewCover.style.backgroundColor = color;
+  if (previewIconBox) {
+    previewIconBox.style.backgroundColor = color;
+    previewIconBox.textContent = icon;
+  }
+  if (previewTitle) previewTitle.textContent = title;
+  if (previewDesc) previewDesc.textContent = desc;
+
+  if (previewMethodologyChip) {
+    previewMethodologyChip.className = 'project-methodology-chip methodology-hybrid';
+    previewMethodologyChip.textContent = '⚡ Hybride (Kanban • Scrum • Gantt)';
+  }
+}
+</script>

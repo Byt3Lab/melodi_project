@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "name": "melodi_project",
+  "title": "MELODI Projets & Kanban",
+  "description": "Module de gestion de projets agile inspiré de Trello : Tableaux Kanban, Listes dynamiques, Cartes avec Drag & Drop, Checklists, Membres, Étiquettes, Priorités et Suivi d'avancement.",
+  "depends": [
+    "base"
+  ]
+}

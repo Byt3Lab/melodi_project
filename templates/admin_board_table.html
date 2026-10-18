@@ -1,0 +1,183 @@
+<link rel="stylesheet" href="/static/melodi_project/css/kanban.css">
+
+<div class="ds-container ds-py-6">
+  <!-- Header -->
+  <div class="ds-flex ds-items-center ds-justify-between ds-mb-6">
+    <div class="ds-flex ds-items-center ds-gap-3">
+      <a href="/admin/melodi_project/board?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-sm">
+        ← {{ t('kanban_view', 'Vue Kanban') }}
+      </a>
+      <div>
+        <h1 class="ds-text-xl ds-font-bold ds-text-primary" style="margin: 0;">{{ board.title }} - {{ t('table_view', 'Synthèse Tabulaire') }}</h1>
+        <p class="ds-text-xs ds-text-secondary">{{ t('projects_subtitle', 'Vue d\'ensemble des cartes et échéances.') }}</p>
+      </div>
+    </div>
+    <div class="ds-flex ds-gap-1" style="background-color: var(--ds-color-surface-subtle); padding: 2px; border-radius: var(--ds-radius-md);">
+      <a href="/admin/melodi_project/board?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs">
+        📊 {{ t('kanban_view', 'Kanban') }}
+      </a>
+      <a href="/admin/melodi_project/board/scrum?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs">
+        🏃 {{ t('scrum_view', 'Scrum') }}
+      </a>
+      <a href="/admin/melodi_project/board/gantt?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs">
+        📅 {{ t('gantt_view', 'Gantt') }}
+      </a>
+      <span class="ds-btn ds-btn-primary ds-btn-xs">📋 {{ t('table_view', 'Table') }}</span>
+    </div>
+  </div>
+
+  <!-- Cards Table -->
+  <div class="ds-card ds-overflow-hidden">
+    <table class="ds-table" style="width: 100%;">
+      <thead>
+        <tr>
+          <th>{{ t('card_title_placeholder', 'Titre de la carte') }}</th>
+          <th>{{ t('add_list', 'Colonne') }}</th>
+          <th>{{ t('priority', 'Priorité') }}</th>
+          <th>{{ t('due_date', 'Échéance') }}</th>
+          <th>{{ t('members', 'Assigné(s)') }}</th>
+          <th>{{ t('checklist', 'Checklist') }}</th>
+          <th style="text-align: right;">{{ t('actions', 'Actions') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if cards and cards|length > 0 %}
+          {% for card in cards %}
+            <tr>
+              <td>
+                <span class="ds-font-medium ds-text-primary">{{ card.title }}</span>
+                {% if card.is_completed %}
+                  <span class="ds-badge ds-badge-success ds-ml-2">✓ {{ t('completed', 'Terminée') }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="ds-badge ds-badge-subtle">{{ card.list.title if card.list else '-' }}</span>
+              </td>
+              <td>
+                <span class="ds-badge {% if card.priority == 'urgent' %}ds-badge-danger{% elif card.priority == 'high' %}ds-badge-warning{% else %}ds-badge-subtle{% endif %}">
+                  {{ card.priority|upper }}
+                </span>
+              </td>
+              <td>
+                {% if card.due_date %}
+                  <span class="ds-text-xs {% if card.is_completed %}ds-text-success{% else %}ds-text-danger ds-font-bold{% endif %}">
+                    📅 {{ card.due_date.strftime('%d/%m/%Y') }}
+                  </span>
+                {% else %}
+                  <span class="ds-text-xs ds-text-muted">-</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if card.assignees and card.assignees|length > 0 %}
+                  <div class="ds-flex ds-items-center ds-gap-1">
+                    {% for a in card.assignees %}
+                      <span class="kanban-avatar-chip" title="{{ a.user_id }}">{{ a.user_id[:2]|upper }}</span>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <span class="ds-text-xs ds-text-muted">{{ t('unassigned', 'Non assigné') }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% set cl = card.checklist_summary %}
+                {% if cl.total > 0 %}
+                  <span class="ds-text-xs ds-font-medium">{{ cl.done }}/{{ cl.total }} ({{ cl.percent }}%)</span>
+                {% else %}
+                  <span class="ds-text-xs ds-text-muted">-</span>
+                {% endif %}
+              </td>
+              <td style="text-align: right;">
+                <button type="button" class="ds-btn ds-btn-subtle ds-btn-xs" onclick="openCardDetailModal('{{ card.id }}')">
+                  👁 {{ t('edit', 'Détails') }}
+                </button>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" class="ds-text-center ds-py-6 ds-text-secondary">
+              {{ t('no_cards_in_list', 'Aucune carte trouvée pour ce tableau.') }}
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Reusable Card Modal -->
+<!-- Modal de détail de carte Trello-Style -->
+<div id="card-detail-modal" class="card-modal-backdrop">
+  <div class="card-modal-container">
+    <div class="card-modal-header">
+      <div style="flex: 1;">
+        <div class="ds-flex ds-items-center ds-gap-2 ds-mb-1">
+          <span id="modal-card-priority" class="ds-badge ds-badge-primary">NORMAL</span>
+          <span class="ds-text-xs ds-text-muted">Échéance: <strong id="modal-card-due-date">-</strong></span>
+        </div>
+        <h3 id="modal-card-title" class="ds-text-lg ds-font-bold ds-text-primary" style="margin: 0;"></h3>
+      </div>
+      <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm js-close-modal" title="{{ t('close', 'Fermer') }}">✕</button>
+    </div>
+
+    <div class="card-modal-body">
+      <!-- Main Column -->
+      <div>
+        <!-- Labels & Members Quick summary -->
+        <div class="ds-flex ds-gap-4 ds-mb-4 ds-flex-wrap">
+          <div style="flex: 1;">
+            <div class="card-modal-section-title">{{ t('labels', 'Étiquettes') }}</div>
+            <div id="modal-card-labels" class="ds-flex ds-gap-1 ds-flex-wrap"></div>
+          </div>
+          <div style="flex: 1;">
+            <div class="card-modal-section-title">{{ t('members', 'Membres') }}</div>
+            <div id="modal-card-assignees" class="ds-flex ds-items-center"></div>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="ds-mb-6">
+          <div class="card-modal-section-title">
+            <span>📝</span> {{ t('board_description', 'Description') }}
+          </div>
+          <div id="modal-card-desc" class="ds-p-3 ds-border ds-rounded-md ds-text-sm" style="background-color: var(--ds-color-surface-subtle); white-space: pre-wrap; min-height: 60px;"></div>
+        </div>
+
+        <!-- Checklists Container -->
+        <div class="ds-mb-6">
+          <div id="modal-checklists-container"></div>
+        </div>
+
+        <!-- Comments & Activity -->
+        <div class="ds-mb-4">
+          <div class="card-modal-section-title">
+            <span>💬</span> {{ t('comments', 'Commentaires') }}
+          </div>
+          <form id="modal-comment-form" class="ds-mb-3">
+            <textarea class="ds-textarea ds-mb-2" rows="2" placeholder="{{ t('add_comment', 'Écrire un commentaire...') }}" required style="width: 100%;"></textarea>
+            <button type="submit" class="ds-btn ds-btn-primary ds-btn-sm">{{ t('post_comment', 'Envoyer') }}</button>
+          </form>
+          <div id="modal-comments-list"></div>
+        </div>
+      </div>
+
+      <!-- Sidebar Actions Column -->
+      <div style="border-left: 1px solid var(--ds-color-border-subtle); padding-left: var(--ds-space-4);">
+        <div class="ds-text-xs ds-font-bold ds-text-muted ds-mb-2" style="text-transform: uppercase;">{{ t('actions', 'Actions') }}</div>
+        <div class="ds-flex ds-flex-col ds-gap-2">
+          <button type="button" id="js-toggle-complete-card" class="ds-btn ds-btn-outline ds-btn-sm" style="width: 100%; justify-content: flex-start;">
+            ✓ {{ t('mark_completed', 'Terminer / Rouvrir') }}
+          </button>
+          <button type="button" id="js-add-checklist-trigger" class="ds-btn ds-btn-outline ds-btn-sm" style="width: 100%; justify-content: flex-start;">
+            ☑ {{ t('add_checklist', 'Ajouter une checklist') }}
+          </button>
+          <button type="button" id="js-delete-card-trigger" class="ds-btn ds-btn-danger ds-btn-sm" style="width: 100%; justify-content: flex-start; margin-top: var(--ds-space-4);">
+            🗑 {{ t('delete', 'Supprimer la carte') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/melodi_project/js/card_modal.js"></script>
