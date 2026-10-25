@@ -1,426 +1,497 @@
-<link rel="stylesheet" href="/static/melodi_project/css/kanban.css">
+{% macro ic(name, cls='') -%}
+<span class="pm-ic {{ cls }}" style="--pm-icon: url('/static_base_icons?name={{ name }}')" aria-hidden="true"></span>
+{%- endmacro %}
+{% set view_paths = {'kanban': '/admin/melodi_project/board', 'scrum': '/admin/melodi_project/board/scrum', 'gantt': '/admin/melodi_project/board/gantt', 'table': '/admin/melodi_project/board/table'} %}
+{% set board_icons = ['🚀', '💻', '📱', '🎯', '💡', '🛠️', '📊', '🌐'] %}
+{% set board_colors = ['#4F46E5', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#64748B'] %}
 
-<div class="ds-container ds-py-6">
-  <!-- Hero Section -->
-  <div class="project-hero ds-flex ds-items-center ds-justify-between ds-flex-wrap ds-gap-4">
+<div class="pm-app pm-page">
+
+  <!-- ===================== Page header ===================== -->
+  <header class="pm-page-header">
     <div>
-      <span class="project-badge-pill">
-        <span class="project-pulse-dot"></span>
-        {{ t('badge_agile_management', 'Gestion de Projets & Méthodologies Agiles') }}
-      </span>
-      <h1 class="ds-text-2xl ds-font-bold ds-text-primary" style="margin: 0.25rem 0;">{{ t('projects_title', 'Gestion de Projets & Kanban') }}</h1>
-      <p class="ds-text-sm ds-text-secondary" style="margin: 0; max-width: 650px;">
-        {{ t('projects_subtitle', 'Organisez vos équipes, vos tâches et vos flux de travail visuels inspirés de Trello, Scrum et Gantt.') }}
-      </p>
+      <div class="pm-eyebrow">{{ ic('view_kanban', 'pm-ic-sm') }} {{ t('badge_agile_management', 'Projets & méthodes agiles') }}</div>
+      <h1 class="pm-page-title">{{ t('projects_title', 'Projets') }}</h1>
+      <p class="pm-page-subtitle">{{ t('projects_subtitle', 'Pilotez vos projets en Kanban, Scrum et Gantt depuis un seul espace.') }}</p>
     </div>
-    <div>
-      <button type="button" class="ds-btn ds-btn-primary" style="padding: 0.65rem 1.25rem; font-size: 0.875rem; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);" onclick="document.getElementById('new-board-modal').classList.add('is-open');">
-        + {{ t('new_board', 'Nouveau Tableau') }}
+    <div class="pm-page-actions">
+      <button type="button" class="ds-btn ds-btn-primary" data-pm-open="new-board-modal">
+        {{ ic('add', 'pm-ic-md') }} {{ t('new_board', 'Nouveau projet') }}
       </button>
     </div>
+  </header>
+
+  <!-- ===================== KPIs ===================== -->
+  <section class="pm-kpis" aria-label="{{ t('kpi_section', 'Indicateurs clés') }}">
+    <div class="pm-kpi">
+      <div class="pm-kpi-icon">{{ ic('folder_open', 'pm-ic-lg') }}</div>
+      <div>
+        <div class="pm-kpi-label">{{ t('total_boards', 'Projets actifs') }}</div>
+        <div class="pm-kpi-value">{{ stats.total_boards }}</div>
+      </div>
+    </div>
+    <div class="pm-kpi pm-kpi--info">
+      <div class="pm-kpi-icon">{{ ic('bolt', 'pm-ic-lg') }}</div>
+      <div>
+        <div class="pm-kpi-label">{{ t('active_cards', 'Tâches en cours') }}</div>
+        <div class="pm-kpi-value">{{ stats.active_cards }}</div>
+      </div>
+    </div>
+    <div class="pm-kpi pm-kpi--danger">
+      <div class="pm-kpi-icon">{{ ic('schedule', 'pm-ic-lg') }}</div>
+      <div>
+        <div class="pm-kpi-label">{{ t('overdue_cards', 'En retard') }}</div>
+        <div class="pm-kpi-value {% if stats.overdue_cards > 0 %}is-alert{% endif %}">{{ stats.overdue_cards }}</div>
+      </div>
+    </div>
+    <div class="pm-kpi pm-kpi--success">
+      <div class="pm-kpi-icon">{{ ic('task_alt', 'pm-ic-lg') }}</div>
+      <div>
+        <div class="pm-kpi-label">{{ t('completed_cards', 'Tâches terminées') }}</div>
+        <div class="pm-kpi-value">{{ stats.completed_cards }}</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Toolbar ===================== -->
+  <div class="pm-toolbar">
+    <nav class="pm-segmented" aria-label="{{ t('filters', 'Filtres') }}">
+      <a href="/admin/melodi_project" class="{% if filter_type == 'all' %}is-active{% endif %}" {% if filter_type == 'all' %}aria-current="page"{% endif %}>
+        {{ ic('grid_view', 'pm-ic-sm') }} {{ t('filter_all', 'Tous') }}
+        {% if filter_type == 'all' %}<span class="pm-count">{{ boards|length }}</span>{% endif %}
+      </a>
+      <a href="/admin/melodi_project?filter=favorites" class="{% if filter_type == 'favorites' %}is-active{% endif %}" {% if filter_type == 'favorites' %}aria-current="page"{% endif %}>
+        {{ ic('star', 'pm-ic-sm') }} {{ t('filter_favorites', 'Favoris') }}
+        {% if filter_type == 'favorites' %}<span class="pm-count">{{ boards|length }}</span>{% endif %}
+      </a>
+      <a href="/admin/melodi_project?filter=archived" class="{% if filter_type == 'archived' %}is-active{% endif %}" {% if filter_type == 'archived' %}aria-current="page"{% endif %}>
+        {{ ic('archive', 'pm-ic-sm') }} {{ t('filter_archived', 'Archivés') }}
+        {% if filter_type == 'archived' %}<span class="pm-count">{{ boards|length }}</span>{% endif %}
+      </a>
+    </nav>
+
+    <div class="pm-toolbar-group">
+      <form method="GET" action="/admin/melodi_project" class="pm-search" role="search">
+        {% if filter_type != 'all' %}<input type="hidden" name="filter" value="{{ filter_type }}">{% endif %}
+        {{ ic('search', 'pm-ic-md') }}
+        <input type="search" id="board-search-input" name="q" value="{{ search_query }}" class="ds-input"
+               placeholder="{{ t('search_placeholder', 'Rechercher un projet…') }}"
+               aria-label="{{ t('search_placeholder', 'Rechercher un projet…') }}" autocomplete="off">
+        <kbd>/</kbd>
+      </form>
+
+      <select id="board-sort" class="ds-select" style="height: 38px; width: auto;" aria-label="{{ t('sort_by', 'Trier par') }}">
+        <option value="recent">{{ t('sort_recent', 'Récemment modifiés') }}</option>
+        <option value="name">{{ t('sort_name', 'Nom (A → Z)') }}</option>
+        <option value="progress">{{ t('sort_progress', 'Progression') }}</option>
+      </select>
+
+      <div class="pm-segmented" role="group" aria-label="{{ t('layout', 'Affichage') }}">
+        <button type="button" data-layout="grid" title="{{ t('layout_grid', 'Grille') }}" aria-label="{{ t('layout_grid', 'Grille') }}">{{ ic('grid_view', 'pm-ic-md') }}</button>
+        <button type="button" data-layout="list" title="{{ t('layout_list', 'Liste') }}" aria-label="{{ t('layout_list', 'Liste') }}">{{ ic('view_list', 'pm-ic-md') }}</button>
+      </div>
+    </div>
   </div>
 
-  <!-- Global KPI Stat Cards -->
-  <div class="project-stats-grid">
-    <div class="project-stat-card">
-      <div>
-        <div class="ds-text-xs ds-text-secondary ds-font-medium">{{ t('total_boards', 'Tableaux Actifs') }}</div>
-        <div class="ds-text-2xl ds-font-bold ds-text-primary ds-mt-1">{{ stats.total_boards }}</div>
-      </div>
-      <div class="project-stat-icon-wrap project-stat-icon-primary">
-        📁
-      </div>
-    </div>
-    <div class="project-stat-card">
-      <div>
-        <div class="ds-text-xs ds-text-secondary ds-font-medium">{{ t('active_cards', 'Tâches en Cours') }}</div>
-        <div class="ds-text-2xl ds-font-bold ds-text-primary ds-mt-1">{{ stats.active_cards }}</div>
-      </div>
-      <div class="project-stat-icon-wrap project-stat-icon-info">
-        ⚡
-      </div>
-    </div>
-    <div class="project-stat-card">
-      <div>
-        <div class="ds-text-xs ds-text-secondary ds-font-medium">{{ t('overdue_cards', 'En Retard') }}</div>
-        <div class="ds-text-2xl ds-font-bold ds-text-danger ds-mt-1">{{ stats.overdue_cards }}</div>
-      </div>
-      <div class="project-stat-icon-wrap project-stat-icon-danger">
-        ⚠️
-      </div>
-    </div>
-    <div class="project-stat-card">
-      <div>
-        <div class="ds-text-xs ds-text-secondary ds-font-medium">{{ t('completed_cards', 'Tâches Terminées') }}</div>
-        <div class="ds-text-2xl ds-font-bold ds-text-success ds-mt-1">{{ stats.completed_cards }}</div>
-      </div>
-      <div class="project-stat-icon-wrap project-stat-icon-success">
-        ✅
-      </div>
-    </div>
-  </div>
-
-  <!-- Filter & Search Toolbar -->
-  <div class="project-toolbar">
-    <div class="project-filter-pills">
-      <a href="/admin/melodi_project" class="project-pill-btn {% if filter_type == 'all' %}is-active{% endif %}">
-        {{ t('filter_all', 'Tous les Tableaux') }}
-        <span class="project-pill-badge">{{ boards|length }}</span>
-      </a>
-      <a href="/admin/melodi_project?filter=favorites" class="project-pill-btn {% if filter_type == 'favorites' %}is-active{% endif %}">
-        ⭐ {{ t('filter_favorites', 'Favoris') }}
-      </a>
-      <a href="/admin/melodi_project?filter=archived" class="project-pill-btn {% if filter_type == 'archived' %}is-active{% endif %}">
-        📁 {{ t('filter_archived', 'Archivés') }}
-      </a>
-    </div>
-
-    <div class="ds-flex ds-items-center ds-gap-2">
-      <div style="position: relative;">
-        <input type="text" id="board-search-input" name="q" value="{{ search_query }}" placeholder="{{ t('search_placeholder', 'Rechercher un tableau ou une tâche...') }}" class="ds-input ds-input-sm" style="width: 300px; padding-left: 2.25rem; height: 38px; border-radius: var(--ds-radius-md, 0.5rem);" onkeyup="filterBoardsClient(this.value)">
-        <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 0.875rem; opacity: 0.6; pointer-events: none;">🔍</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Boards Grid -->
+  <!-- ===================== Boards ===================== -->
   {% if boards and boards|length > 0 %}
-    <div class="project-boards-grid" id="boards-grid-container">
+    <div class="pm-boards" id="boards-grid-container">
       {% for item in boards %}
         {% set b = item.board %}
-        {% set summary = item.summary %}
-        <div class="project-board-card" data-title="{{ b.title|lower }}" data-desc="{{ (b.description or '')|lower }}" data-type="{{ b.project_type or 'hybrid' }}">
-          <!-- Colored Top Cover -->
-          <div class="project-board-card-cover" style="background-color: {{ b.color }};">
-            <form method="POST" action="/admin/melodi_project" style="margin: 0;">
-              <input type="hidden" name="action_type" value="toggle_favorite">
-              <input type="hidden" name="board_id" value="{{ b.id }}">
-              <button type="submit" class="project-board-fav-btn" title="{{ t('filter_favorites', 'Favori') }}">
-                {% if b.is_favorite %}⭐{% else %}<span style="opacity: 0.6;">☆</span>{% endif %}
-              </button>
-            </form>
-          </div>
-
-          <!-- Body -->
-          <div class="project-board-card-body">
-            <!-- Top Avatar & Chips Row -->
-            <div class="project-board-top-row">
-              <div class="project-board-icon-avatar" style="background-color: {{ b.color }};">
-                {{ b.icon or '📋' }}
+        {% set s = item.summary %}
+        {% set vis = b.visibility.value if b.visibility.value is defined else b.visibility %}
+        {% set board_icon = b.icon if (b.icon and b.icon|length <= 3) else (b.title[:1]|upper) %}
+        {% set open_url = view_paths.get(b.default_view or 'kanban', view_paths['kanban']) ~ '?id=' ~ b.id %}
+        <article class="pm-board" style="--pm-board: {{ b.color or '#4F46E5' }};"
+                 data-title="{{ b.title|lower }}" data-desc="{{ (b.description or '')|lower }}"
+                 data-progress="{{ s.progress_percent or 0 }}"
+                 data-updated="{{ b.updated_at.isoformat() if b.updated_at else '' }}">
+          <div class="pm-board-body">
+            <div class="pm-board-head">
+              <div class="pm-board-avatar" aria-hidden="true">{{ board_icon }}</div>
+              <div class="pm-board-heading">
+                <a href="{{ open_url }}" class="pm-board-link pm-board-title">{{ b.title }}</a>
+                <div class="pm-board-meta">
+                  {% if vis == 'private' %}{{ ic('lock', 'pm-ic-sm') }} {{ t('visibility_private_short', 'Privé') }}
+                  {% elif vis == 'public' %}{{ ic('public', 'pm-ic-sm') }} {{ t('visibility_public_short', 'Public') }}
+                  {% else %}{{ ic('groups', 'pm-ic-sm') }} {{ t('visibility_team_short', 'Équipe') }}{% endif %}
+                  <span class="pm-dot"></span>
+                  <span>{{ s.total_cards or 0 }} {{ t('tasks', 'tâches') }}</span>
+                </div>
               </div>
-              <div class="project-chip-group">
-                <span class="project-methodology-chip methodology-hybrid">⚡ {{ t('project_type_hybrid', 'Hybride') }} (Kanban • Scrum • Gantt)</span>
 
-                <span class="project-vis-chip">
-                  {% if b.visibility.value == 'team' %}
-                    👥 {{ t('visibility_team', 'Équipe') }}
-                  {% elif b.visibility.value == 'private' %}
-                    🔒 {{ t('visibility_private', 'Privé') }}
-                  {% else %}
-                    🌐 {{ t('visibility_public', 'Public') }}
-                  {% endif %}
-                </span>
+              <div class="pm-board-actions pm-above">
+                <form method="POST" action="/admin/melodi_project{% if filter_type != 'all' %}?filter={{ filter_type }}{% endif %}" class="pm-fav-form">
+                  <input type="hidden" name="action_type" value="toggle_favorite">
+                  <input type="hidden" name="board_id" value="{{ b.id }}">
+                  <button type="submit" class="pm-icon-btn {% if b.is_favorite %}is-fav{% endif %}"
+                          title="{{ t('remove_favorite', 'Retirer des favoris') if b.is_favorite else t('add_favorite', 'Ajouter aux favoris') }}"
+                          aria-pressed="{{ 'true' if b.is_favorite else 'false' }}">
+                    {{ ic('star' if b.is_favorite else 'star_outline', 'pm-ic-md') }}
+                  </button>
+                </form>
+                <div class="pm-menu" data-pm-menu>
+                  <button type="button" class="pm-icon-btn" aria-haspopup="menu" aria-expanded="false" title="{{ t('more_actions', 'Plus d\'actions') }}">
+                    {{ ic('more_vert', 'pm-ic-md') }}
+                  </button>
+                  <div class="pm-menu-list" role="menu">
+                    <a role="menuitem" class="pm-menu-item" href="/admin/melodi_project/board?id={{ b.id }}">{{ ic('view_kanban', 'pm-ic-sm') }} {{ t('kanban_view', 'Kanban') }}</a>
+                    <a role="menuitem" class="pm-menu-item" href="/admin/melodi_project/board/scrum?id={{ b.id }}">{{ ic('directions_run', 'pm-ic-sm') }} {{ t('scrum_view', 'Scrum') }}</a>
+                    <a role="menuitem" class="pm-menu-item" href="/admin/melodi_project/board/gantt?id={{ b.id }}">{{ ic('view_timeline', 'pm-ic-sm') }} {{ t('gantt_view', 'Gantt') }}</a>
+                    <a role="menuitem" class="pm-menu-item" href="/admin/melodi_project/board/table?id={{ b.id }}">{{ ic('table_rows', 'pm-ic-sm') }} {{ t('table_view', 'Tableau') }}</a>
+                    <div class="pm-menu-sep"></div>
+                    <form method="POST" action="/admin/melodi_project{% if filter_type != 'all' %}?filter={{ filter_type }}{% endif %}">
+                      <input type="hidden" name="action_type" value="{{ 'unarchive_board' if b.is_archived else 'archive_board' }}">
+                      <input type="hidden" name="board_id" value="{{ b.id }}">
+                      <button type="submit" role="menuitem" class="pm-menu-item">
+                        {% if b.is_archived %}{{ ic('unarchive', 'pm-ic-sm') }} {{ t('unarchive', 'Restaurer') }}{% else %}{{ ic('archive', 'pm-ic-sm') }} {{ t('archive', 'Archiver') }}{% endif %}
+                      </button>
+                    </form>
+                    <button type="button" role="menuitem" class="pm-menu-item pm-menu-item--danger"
+                            data-pm-delete="{{ b.id }}" data-pm-title="{{ b.title }}">
+                      {{ ic('delete', 'pm-ic-sm') }} {{ t('delete', 'Supprimer') }}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <!-- Title & Description -->
-            <a href="/admin/melodi_project/board?id={{ b.id }}" class="project-board-card-title">
-              {{ b.title }}
-            </a>
-            <div class="project-board-card-desc">
-              {{ b.description or t('empty_boards_desc', 'Tableau de suivi et de gestion de projet.') }}
-            </div>
+            <p class="pm-board-desc {% if not b.description %}is-empty{% endif %}">
+              {{ b.description or t('no_description', 'Aucune description.') }}
+            </p>
 
-            <!-- Active Sprint Indicator -->
-            {% if summary.active_sprint %}
-              <div class="project-active-sprint-chip">
-                <span class="project-pulse-dot"></span>
-                <span><strong>{{ t('active_sprint_badge', 'Sprint actif') }}:</strong> {{ summary.active_sprint.name }}</span>
-                <span style="margin-left: auto; font-weight: 600;">{{ summary.active_sprint.progress_percent }}%</span>
+            {% if s.active_sprint %}
+              <div class="pm-sprint">
+                <span class="pm-pulse"></span>
+                <span class="pm-sprint-name">{{ s.active_sprint.name }}</span>
+                <span class="pm-sprint-pct">{{ s.active_sprint.progress_percent }}%</span>
               </div>
             {% endif %}
 
-            <!-- Micro Metrics Row -->
-            <div class="project-board-meta-row">
-              <span class="project-board-meta-item">
-                <span>📋</span> {{ summary.total_lists }} {{ t('total_lists', 'colonnes') }}
-              </span>
-              <span class="project-board-meta-item">
-                <span>🏃</span> {{ summary.total_sprints }} {{ t('total_sprints', 'sprints') }}
-              </span>
-              <span class="project-board-meta-item">
-                <span>🚩</span> {{ summary.total_epics }} {{ t('total_epics', 'epics') }}
-              </span>
+            <div class="pm-stats">
+              <span class="pm-stat" title="{{ t('total_lists', 'Colonnes') }}">{{ ic('view_week', 'pm-ic-sm') }} <strong>{{ s.total_lists or 0 }}</strong></span>
+              <span class="pm-stat" title="{{ t('total_sprints', 'Sprints') }}">{{ ic('directions_run', 'pm-ic-sm') }} <strong>{{ s.total_sprints or 0 }}</strong></span>
+              <span class="pm-stat" title="{{ t('total_epics', 'Epics') }}">{{ ic('flag', 'pm-ic-sm') }} <strong>{{ s.total_epics or 0 }}</strong></span>
             </div>
 
-            <!-- Progress Bar -->
-            <div class="project-board-card-progress">
-              <div class="ds-flex ds-justify-between ds-text-xs ds-text-secondary ds-mb-1">
+            <div class="pm-progress">
+              <div class="pm-progress-row">
                 <span>{{ t('progress_label', 'Progression') }}</span>
-                <strong>{{ summary.progress_percent }}% ({{ summary.completed_cards }}/{{ summary.total_cards }})</strong>
+                <strong>{{ s.progress_percent or 0 }}% <span class="ds-text-muted" style="font-weight: 400;">· {{ s.completed_cards or 0 }}/{{ s.total_cards or 0 }}</span></strong>
               </div>
-              <div class="project-progress-track">
-                <div class="project-progress-fill" style="width: {{ summary.progress_percent }}%; background-color: {{ b.color }};"></div>
-              </div>
-            </div>
-
-            <!-- Footer: Stacked Members & Quick View Switchers -->
-            <div class="project-board-card-footer">
-              <div class="project-avatar-stack">
-                {% if summary.members and summary.members|length > 0 %}
-                  {% for m in summary.members[:4] %}
-                    <div class="project-avatar-bubble" title="{{ m }}">
-                      {{ m[:2]|upper }}
-                    </div>
-                  {% endfor %}
-                  {% if summary.members_count > 4 %}
-                    <div class="project-avatar-bubble" style="background: var(--ds-color-surface-subtle); color: var(--ds-color-text-secondary);">
-                      +{{ summary.members_count - 4 }}
-                    </div>
-                  {% endif %}
-                {% else %}
-                  <div class="project-avatar-bubble" style="background: var(--ds-color-surface-subtle); color: var(--ds-color-text-muted);" title="{{ t('all_members', 'Équipe') }}">
-                    👥
-                  </div>
-                {% endif %}
-              </div>
-
-              <!-- Quick View Links -->
-              <div class="project-view-buttons">
-                <a href="/admin/melodi_project/board?id={{ b.id }}" class="project-view-btn" title="{{ t('kanban_view', 'Vue Kanban') }}">
-                  📋 {{ t('open_kanban', 'Kanban') }}
-                </a>
-                <a href="/admin/melodi_project/board/scrum?id={{ b.id }}" class="project-view-btn" title="{{ t('scrum_view', 'Vue Scrum') }}">
-                  🏃 {{ t('open_scrum', 'Scrum') }}
-                </a>
-                <a href="/admin/melodi_project/board/gantt?id={{ b.id }}" class="project-view-btn" title="{{ t('gantt_view', 'Vue Gantt') }}">
-                  📅 {{ t('open_gantt', 'Gantt') }}
-                </a>
+              <div class="pm-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ s.progress_percent or 0 }}">
+                <div class="pm-track-fill" style="width: {{ s.progress_percent or 0 }}%;"></div>
               </div>
             </div>
           </div>
-        </div>
+
+          <footer class="pm-board-foot">
+            <div class="pm-avatars">
+              {% if s.members and s.members|length > 0 %}
+                {% for m in s.members[:4] %}
+                  <span class="pm-avatar" title="{{ m }}">{{ m[:2]|upper }}</span>
+                {% endfor %}
+                {% if s.members_count > 4 %}
+                  <span class="pm-avatar pm-avatar--more">+{{ s.members_count - 4 }}</span>
+                {% endif %}
+              {% else %}
+                <span class="pm-avatar pm-avatar--empty" title="{{ t('no_members', 'Aucun membre') }}">{{ ic('person_add', 'pm-ic-sm') }}</span>
+              {% endif %}
+            </div>
+            <nav class="pm-views pm-above" aria-label="{{ t('views', 'Vues') }}">
+              <a href="/admin/melodi_project/board?id={{ b.id }}" class="pm-view-link" title="{{ t('kanban_view', 'Kanban') }}">{{ ic('view_kanban', 'pm-ic-md') }}</a>
+              <a href="/admin/melodi_project/board/scrum?id={{ b.id }}" class="pm-view-link" title="{{ t('scrum_view', 'Scrum') }}">{{ ic('directions_run', 'pm-ic-md') }}</a>
+              <a href="/admin/melodi_project/board/gantt?id={{ b.id }}" class="pm-view-link" title="{{ t('gantt_view', 'Gantt') }}">{{ ic('view_timeline', 'pm-ic-md') }}</a>
+              <a href="/admin/melodi_project/board/table?id={{ b.id }}" class="pm-view-link" title="{{ t('table_view', 'Tableau') }}">{{ ic('table_rows', 'pm-ic-md') }}</a>
+            </nav>
+          </footer>
+        </article>
       {% endfor %}
+
+      {% if filter_type != 'archived' %}
+        <button type="button" class="pm-board-new" data-pm-open="new-board-modal" data-pm-keep>
+          <span class="pm-board-new-icon">{{ ic('add', 'pm-ic-lg') }}</span>
+          <strong>{{ t('new_board', 'Nouveau projet') }}</strong>
+          <span>{{ t('new_board_hint', 'Kanban, Scrum et Gantt inclus') }}</span>
+        </button>
+      {% endif %}
     </div>
 
-    <!-- No Match State (for client filter) -->
-    <div id="no-match-alert" class="ds-card ds-p-8 ds-text-center" style="display: none; margin-top: 1rem;">
-      <div class="ds-text-3xl ds-mb-2">🔍</div>
-      <p class="ds-text-sm ds-text-secondary" style="margin: 0;">{{ t('no_boards_match', 'Aucun tableau ne correspond à votre recherche.') }}</p>
+    <div id="no-match-alert" class="pm-empty" style="display: none; margin-top: var(--ds-space-4);">
+      <div class="pm-empty-icon">{{ ic('search', 'pm-ic-lg') }}</div>
+      <h3>{{ t('no_boards_match_title', 'Aucun résultat') }}</h3>
+      <p>{{ t('no_boards_match', 'Aucun projet ne correspond à votre recherche.') }}</p>
+      <button type="button" class="ds-btn ds-btn-secondary" onclick="pmBoards.clearSearch()">{{ t('clear_search', 'Effacer la recherche') }}</button>
     </div>
   {% else %}
-    <!-- Empty State -->
-    <div class="ds-card ds-p-8 ds-text-center" style="border-radius: var(--ds-radius-xl, 1rem);">
-      <div class="ds-text-5xl ds-mb-3">📋</div>
-      <h3 class="ds-text-lg ds-font-bold ds-text-primary ds-mb-1">{{ t('empty_boards_title', 'Aucun tableau pour le moment') }}</h3>
-      <p class="ds-text-sm ds-text-secondary ds-mb-4" style="max-width: 480px; margin-left: auto; margin-right: auto;">
-        {{ t('empty_boards_desc', 'Créez votre premier projet pour commencer à organiser vos sprints Scrum, vos diagrammes de Gantt et vos tâches Kanban.') }}
-      </p>
-      <button type="button" class="ds-btn ds-btn-primary" style="box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);" onclick="document.getElementById('new-board-modal').classList.add('is-open');">
-        + {{ t('create_first_board', 'Créer un Tableau') }}
-      </button>
+    <div class="pm-empty">
+      {% if filter_type == 'favorites' %}
+        <div class="pm-empty-icon">{{ ic('star_outline', 'pm-ic-lg') }}</div>
+        <h3>{{ t('empty_favorites_title', 'Aucun favori') }}</h3>
+        <p>{{ t('empty_favorites_desc', 'Cliquez sur l\'étoile d\'un projet pour le retrouver ici.') }}</p>
+        <a href="/admin/melodi_project" class="ds-btn ds-btn-secondary">{{ t('see_all_boards', 'Voir tous les projets') }}</a>
+      {% elif filter_type == 'archived' %}
+        <div class="pm-empty-icon">{{ ic('archive', 'pm-ic-lg') }}</div>
+        <h3>{{ t('empty_archived_title', 'Aucun projet archivé') }}</h3>
+        <p>{{ t('empty_archived_desc', 'Les projets archivés apparaîtront ici et pourront être restaurés à tout moment.') }}</p>
+        <a href="/admin/melodi_project" class="ds-btn ds-btn-secondary">{{ t('see_all_boards', 'Voir tous les projets') }}</a>
+      {% elif search_query %}
+        <div class="pm-empty-icon">{{ ic('search', 'pm-ic-lg') }}</div>
+        <h3>{{ t('no_boards_match_title', 'Aucun résultat') }}</h3>
+        <p>{{ t('no_boards_match', 'Aucun projet ne correspond à votre recherche.') }}</p>
+        <a href="/admin/melodi_project" class="ds-btn ds-btn-secondary">{{ t('clear_search', 'Effacer la recherche') }}</a>
+      {% else %}
+        <div class="pm-empty-icon">{{ ic('rocket_launch', 'pm-ic-lg') }}</div>
+        <h3>{{ t('empty_boards_title', 'Lancez votre premier projet') }}</h3>
+        <p>{{ t('empty_boards_desc', 'Créez un projet pour organiser vos tâches en Kanban, planifier vos sprints Scrum et suivre votre planning Gantt.') }}</p>
+        <button type="button" class="ds-btn ds-btn-primary" data-pm-open="new-board-modal">{{ ic('add', 'pm-ic-md') }} {{ t('create_first_board', 'Créer un projet') }}</button>
+      {% endif %}
     </div>
   {% endif %}
 </div>
 
-<!-- Modal Nouveau Tableau -->
-<div id="new-board-modal" class="card-modal-backdrop">
-  <div class="card-modal-container" style="max-width: 600px;">
+<!-- ===================== Modal : new project ===================== -->
+<div id="new-board-modal" class="card-modal-backdrop pm-app" role="dialog" aria-modal="true" aria-labelledby="new-board-title">
+  <div class="card-modal-container" style="max-width: 620px;">
     <div class="card-modal-header">
-      <div class="ds-flex ds-items-center ds-gap-2">
-        <span class="ds-text-xl">✨</span>
-        <h3 class="ds-text-lg ds-font-bold ds-text-primary" style="margin: 0;">{{ t('new_board', 'Nouveau Tableau de Projet') }}</h3>
+      <div class="ds-flex ds-items-center ds-gap-3">
+        <div id="preview-icon-box" class="pm-board-avatar" style="--pm-board: {{ board_colors[0] }};">{{ board_icons[0] }}</div>
+        <div>
+          <h3 id="new-board-title" class="ds-text-lg ds-font-bold" style="margin: 0;">{{ t('new_board', 'Nouveau projet') }}</h3>
+          <div class="ds-text-xs ds-text-muted">{{ t('new_board_subtitle', 'Kanban, Scrum et Gantt sont activés automatiquement.') }}</div>
+        </div>
       </div>
-      <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm" onclick="document.getElementById('new-board-modal').classList.remove('is-open');">✕</button>
+      <button type="button" class="pm-icon-btn" data-pm-close aria-label="{{ t('close', 'Fermer') }}">{{ ic('close', 'pm-ic-md') }}</button>
     </div>
-    <form method="POST" action="/admin/melodi_project">
+
+    <form method="POST" action="/admin/melodi_project" style="display: flex; flex-direction: column; min-height: 0;">
       <input type="hidden" name="action_type" value="create_board">
-      <div style="padding: 1.75rem 2rem; max-height: 72vh; overflow-y: auto;">
-        <!-- Unified All-in-One Methodology Banner -->
-        <div class="ds-p-4 ds-rounded-lg ds-mb-5" style="background-color: var(--ds-color-surface-subtle); border: 1px solid var(--ds-color-border-subtle);">
-          <div class="ds-flex ds-items-center ds-gap-2 ds-text-sm ds-font-bold ds-text-primary">
-            <span>⚡</span> {{ t('all_in_one_methodology', 'Projet Tout-en-Un (Kanban + Scrum + Gantt)') }}
-          </div>
-          <div class="ds-text-xs ds-text-secondary ds-mt-1">
-            {{ t('all_in_one_methodology_desc', 'Toutes les méthodologies interagissent ensemble nativement : flux continu Kanban, gestion par Sprints Scrum et vision macro Gantt.') }}
-          </div>
-        </div>
-        <input type="hidden" name="project_type" value="hybrid">
+      <input type="hidden" name="project_type" value="hybrid">
 
-        <!-- Board Title -->
-        <div class="ds-mb-4">
-          <label class="ds-label ds-mb-1 ds-font-medium">{{ t('board_title', 'Titre du tableau') }} *</label>
-          <input type="text" id="modal-board-title" name="title" required class="ds-input" placeholder="{{ t('board_title_placeholder', 'Ex: Refonte Plateforme Web, V2 Mobile...') }}" oninput="updateModalPreview()">
+      <div style="padding: var(--ds-space-6); overflow-y: auto;">
+        <div class="pm-field">
+          <label class="ds-label" for="modal-board-title">{{ t('board_title', 'Nom du projet') }} <span class="pm-required">*</span></label>
+          <input type="text" id="modal-board-title" name="title" required maxlength="150" class="ds-input"
+                 placeholder="{{ t('board_title_placeholder', 'Ex : Refonte du site web, App mobile V2…') }}">
         </div>
 
-        <!-- Description -->
-        <div class="ds-mb-4">
-          <label class="ds-label ds-mb-1 ds-font-medium">{{ t('board_description', 'Description') }}</label>
-          <textarea id="modal-board-desc" name="description" rows="2" class="ds-textarea" placeholder="{{ t('board_description_placeholder', 'Objectifs du projet, jalons clés...') }}" oninput="updateModalPreview()"></textarea>
+        <div class="pm-field">
+          <label class="ds-label" for="modal-board-desc">{{ t('board_description', 'Description') }}</label>
+          <textarea id="modal-board-desc" name="description" rows="2" class="ds-textarea"
+                    placeholder="{{ t('board_description_placeholder', 'Objectifs, périmètre, jalons clés…') }}"></textarea>
         </div>
 
-        <!-- Theme Color & Icon Selection -->
-        <div class="ds-grid ds-grid-cols-2 ds-gap-4 ds-mb-4">
-          <div>
-            <label class="ds-label ds-mb-1 ds-font-medium">{{ t('board_color', 'Couleur du thème') }}</label>
-            <div class="color-swatch-list">
-              <label class="color-swatch-option">
-                <input type="radio" name="color" value="#4F46E5" checked onchange="updateModalPreview()">
-                <span class="color-swatch-box" style="background: #4F46E5;"></span>
-              </label>
-              <label class="color-swatch-option">
-                <input type="radio" name="color" value="#0EA5E9" onchange="updateModalPreview()">
-                <span class="color-swatch-box" style="background: #0EA5E9;"></span>
-              </label>
-              <label class="color-swatch-option">
-                <input type="radio" name="color" value="#10B981" onchange="updateModalPreview()">
-                <span class="color-swatch-box" style="background: #10B981;"></span>
-              </label>
-              <label class="color-swatch-option">
-                <input type="radio" name="color" value="#F59E0B" onchange="updateModalPreview()">
-                <span class="color-swatch-box" style="background: #F59E0B;"></span>
-              </label>
-              <label class="color-swatch-option">
-                <input type="radio" name="color" value="#EF4444" onchange="updateModalPreview()">
-                <span class="color-swatch-box" style="background: #EF4444;"></span>
-              </label>
-              <label class="color-swatch-option">
-                <input type="radio" name="color" value="#8B5CF6" onchange="updateModalPreview()">
-                <span class="color-swatch-box" style="background: #8B5CF6;"></span>
-              </label>
-            </div>
+        <div class="pm-field">
+          <span class="ds-label">{{ t('board_icon', 'Icône') }}</span>
+          <div class="pm-icon-picker">
+            {% for icn in board_icons %}
+              <label><input type="radio" name="icon" value="{{ icn }}" {% if loop.first %}checked{% endif %}><span>{{ icn }}</span></label>
+            {% endfor %}
           </div>
+        </div>
 
-          <div>
-            <label class="ds-label ds-mb-1 ds-font-medium">{{ t('board_icon', 'Icône') }}</label>
-            <select id="modal-board-icon" name="icon" class="ds-select" onchange="updateModalPreview()">
-              <option value="🚀">🚀 Fusée / Lancement</option>
-              <option value="💻">💻 Développement Tech</option>
-              <option value="📱">📱 Application Mobile</option>
-              <option value="🎯">🎯 Objectif Stratégique</option>
-              <option value="💡">💡 Innovation / R&D</option>
-              <option value="🛠️">🛠️ Infrastructure / DevOps</option>
-              <option value="📊">📊 Gestion & Marketing</option>
-              <option value="🌐">🌐 Web & Réseau</option>
+        <div class="pm-field">
+          <span class="ds-label">{{ t('board_color', 'Couleur') }}</span>
+          <div class="color-swatch-list">
+            {% for col in board_colors %}
+              <label class="color-swatch-option" title="{{ col }}">
+                <input type="radio" name="color" value="{{ col }}" {% if loop.first %}checked{% endif %}>
+                <span class="color-swatch-box" style="background: {{ col }};"></span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="pm-field">
+          <span class="ds-label">{{ t('default_view', 'Vue par défaut') }}</span>
+          <div class="pm-choice-grid">
+            <label class="pm-choice"><input type="radio" name="default_view" value="kanban" checked>
+              <span><strong>{{ ic('view_kanban', 'pm-ic-sm') }} {{ t('kanban_view', 'Kanban') }}</strong>{{ t('kanban_view_desc', 'Flux de tâches par colonnes') }}</span></label>
+            <label class="pm-choice"><input type="radio" name="default_view" value="scrum">
+              <span><strong>{{ ic('directions_run', 'pm-ic-sm') }} {{ t('scrum_view', 'Scrum') }}</strong>{{ t('scrum_view_desc', 'Backlog et sprints') }}</span></label>
+            <label class="pm-choice"><input type="radio" name="default_view" value="gantt">
+              <span><strong>{{ ic('view_timeline', 'pm-ic-sm') }} {{ t('gantt_view', 'Gantt') }}</strong>{{ t('gantt_view_desc', 'Planning et dépendances') }}</span></label>
+          </div>
+        </div>
+
+        <div class="pm-field-row">
+          <div class="pm-field" style="margin: 0;">
+            <label class="ds-label" for="modal-board-vis">{{ t('board_visibility', 'Visibilité') }}</label>
+            <select id="modal-board-vis" name="visibility" class="ds-select">
+              <option value="team">{{ t('visibility_team_short', 'Équipe') }}</option>
+              <option value="private">{{ t('visibility_private_short', 'Privé') }}</option>
+              <option value="public">{{ t('visibility_public_short', 'Public') }}</option>
             </select>
           </div>
-        </div>
-
-        <!-- Visibility & Default View -->
-        <div class="ds-grid ds-grid-cols-2 ds-gap-4 ds-mb-4">
-          <div>
-            <label class="ds-label ds-mb-1 ds-font-medium">{{ t('board_visibility', 'Visibilité') }}</label>
-            <select name="visibility" class="ds-select">
-              <option value="team">{{ t('visibility_team', 'Équipe (Membres de l\'organisation)') }}</option>
-              <option value="private">{{ t('visibility_private', 'Privé') }}</option>
-              <option value="public">{{ t('visibility_public', 'Public') }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="ds-label ds-mb-1 ds-font-medium">{{ t('default_view', 'Vue par défaut') }}</label>
-            <select name="default_view" class="ds-select">
-              <option value="kanban">📋 {{ t('kanban_view', 'Tableau Kanban') }}</option>
-              <option value="scrum">🏃 {{ t('scrum_view', 'Vue Scrum & Backlog') }}</option>
-              <option value="gantt">📅 {{ t('gantt_view', 'Diagramme de Gantt') }}</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Favorite Checkbox -->
-        <div class="ds-mb-4">
-          <label class="ds-flex ds-items-center ds-gap-2 ds-text-sm" style="cursor: pointer;">
+          <label class="pm-switch-row" style="align-self: end;">
+            <span><strong>{{ t('add_favorite', 'Ajouter aux favoris') }}</strong></span>
             <input type="checkbox" name="is_favorite">
-            <span>⭐ {{ t('filter_favorites', 'Ajouter aux favoris') }}</span>
           </label>
         </div>
-
-        <!-- Live Preview Box -->
-        <div style="padding: 1.25rem 1.5rem; background: var(--ds-color-surface-subtle); border-radius: var(--ds-radius-lg, 0.75rem); border: 1px dashed var(--ds-color-border, #e2e8f0); margin-top: 1.25rem;">
-          <div class="ds-text-xs ds-text-secondary ds-font-medium ds-mb-2">👁️ {{ t('live_preview', 'Aperçu en direct') }}</div>
-          <div class="project-board-card" style="box-shadow: none;">
-            <div id="preview-cover" class="project-board-card-cover" style="height: 48px; background-color: #4F46E5;"></div>
-            <div class="project-board-card-body" style="padding: 1rem 1.25rem;">
-              <div class="project-board-top-row" style="margin-top: -24px;">
-                <div id="preview-icon-box" class="project-board-icon-avatar" style="width: 36px; height: 36px; font-size: 1rem; background-color: #4F46E5;">
-                  🚀
-                </div>
-                <div class="project-chip-group">
-                  <span id="preview-methodology-chip" class="project-methodology-chip methodology-hybrid">⚡ Hybride (Kanban • Scrum • Gantt)</span>
-                </div>
-              </div>
-              <div id="preview-title" class="project-board-card-title" style="font-size: 0.95rem;">
-                Titre du projet
-              </div>
-              <div id="preview-desc" class="project-board-card-desc" style="font-size: 0.78rem; margin-bottom: 0.5rem;">
-                Description du projet...
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <div style="padding: 1.25rem 2rem; background-color: var(--ds-color-surface-subtle); border-top: 1px solid var(--ds-color-border, #e2e8f0); border-bottom-left-radius: var(--ds-radius-xl, 1rem); border-bottom-right-radius: var(--ds-radius-xl, 1rem);" class="ds-flex ds-justify-end ds-gap-3">
-        <button type="button" class="ds-btn ds-btn-subtle" onclick="document.getElementById('new-board-modal').classList.remove('is-open');">
-          {{ t('cancel', 'Annuler') }}
-        </button>
-        <button type="submit" class="ds-btn ds-btn-primary" style="padding: 0.6rem 1.25rem; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);">
-          {{ t('create', 'Créer le Tableau') }}
-        </button>
+      <div class="ds-flex ds-justify-end ds-gap-2" style="padding: var(--ds-space-4) var(--ds-space-6); border-top: 1px solid var(--ds-color-border); background: var(--ds-color-surface-subtle);">
+        <button type="button" class="ds-btn ds-btn-secondary" data-pm-close>{{ t('cancel', 'Annuler') }}</button>
+        <button type="submit" class="ds-btn ds-btn-primary">{{ ic('add', 'pm-ic-md') }} {{ t('create_board', 'Créer le projet') }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== Modal : delete confirmation ===================== -->
+<div id="delete-board-modal" class="card-modal-backdrop pm-app" role="alertdialog" aria-modal="true" aria-labelledby="delete-board-title">
+  <div class="card-modal-container" style="max-width: 440px;">
+    <form method="POST" action="/admin/melodi_project{% if filter_type != 'all' %}?filter={{ filter_type }}{% endif %}">
+      <input type="hidden" name="action_type" value="delete_board">
+      <input type="hidden" name="board_id" id="delete-board-id" value="">
+      <div style="padding: var(--ds-space-6);">
+        <div class="pm-empty-icon" style="margin-bottom: var(--ds-space-4); color: var(--ds-color-danger); background: var(--ds-color-danger-bg);">{{ ic('delete', 'pm-ic-lg') }}</div>
+        <h3 id="delete-board-title" class="ds-text-lg ds-font-bold" style="margin: 0 0 var(--ds-space-2);">{{ t('delete_board_title', 'Supprimer ce projet ?') }}</h3>
+        <p class="ds-text-sm ds-text-muted" style="margin: 0;">
+          {{ t('delete_board_desc', 'Le projet, ses colonnes, tâches, sprints et epics seront définitivement supprimés. Cette action est irréversible.') }}
+        </p>
+        <p class="ds-text-sm" style="margin: var(--ds-space-3) 0 0;"><strong id="delete-board-name"></strong></p>
+      </div>
+      <div class="ds-flex ds-justify-end ds-gap-2" style="padding: var(--ds-space-4) var(--ds-space-6); border-top: 1px solid var(--ds-color-border); background: var(--ds-color-surface-subtle);">
+        <button type="button" class="ds-btn ds-btn-secondary" data-pm-close>{{ t('cancel', 'Annuler') }}</button>
+        <button type="submit" class="ds-btn ds-btn-danger">{{ t('delete_definitively', 'Supprimer définitivement') }}</button>
       </div>
     </form>
   </div>
 </div>
 
 <script>
-function filterBoardsClient(query) {
-  const q = (query || '').toLowerCase().trim();
-  const cards = document.querySelectorAll('#boards-grid-container .project-board-card');
-  let matchCount = 0;
-  cards.forEach(card => {
-    const title = card.getAttribute('data-title') || '';
-    const desc = card.getAttribute('data-desc') || '';
-    if (!q || title.includes(q) || desc.includes(q)) {
-      card.style.display = '';
-      matchCount++;
-    } else {
-      card.style.display = 'none';
+(function () {
+  const LAYOUT_KEY = 'melodi_project.layout';
+  const SORT_KEY = 'melodi_project.sort';
+  const grid = document.getElementById('boards-grid-container');
+  const search = document.getElementById('board-search-input');
+  const sortSel = document.getElementById('board-sort');
+
+  /* ---------- Modals ---------- */
+  function openModal(id) {
+    const m = document.getElementById(id);
+    if (!m) return;
+    m.classList.add('is-open');
+    const f = m.querySelector('input:not([type=hidden]):not([type=radio]), textarea, select');
+    if (f) setTimeout(() => f.focus(), 50);
+  }
+  function closeModal(m) { m && m.classList.remove('is-open'); }
+
+  document.addEventListener('click', (e) => {
+    const opener = e.target.closest('[data-pm-open]');
+    if (opener) { e.preventDefault(); openModal(opener.dataset.pmOpen); return; }
+    const closer = e.target.closest('[data-pm-close]');
+    if (closer) { closeModal(closer.closest('.card-modal-backdrop')); return; }
+    if (e.target.classList.contains('card-modal-backdrop')) { closeModal(e.target); }
+
+    const del = e.target.closest('[data-pm-delete]');
+    if (del) {
+      document.getElementById('delete-board-id').value = del.dataset.pmDelete;
+      document.getElementById('delete-board-name').textContent = del.dataset.pmTitle || '';
+      closeMenus();
+      openModal('delete-board-modal');
+      return;
     }
+
+    /* ---------- Kebab menus ---------- */
+    const menuBtn = e.target.closest('[data-pm-menu] > button');
+    if (menuBtn) {
+      const menu = menuBtn.parentElement;
+      const wasOpen = menu.classList.contains('is-open');
+      closeMenus();
+      if (!wasOpen) { menu.classList.add('is-open'); menuBtn.setAttribute('aria-expanded', 'true'); }
+      return;
+    }
+    if (!e.target.closest('[data-pm-menu]')) closeMenus();
   });
 
-  const noMatchAlert = document.getElementById('no-match-alert');
-  if (noMatchAlert) {
-    noMatchAlert.style.display = (matchCount === 0 && cards.length > 0) ? 'block' : 'none';
+  function closeMenus() {
+    document.querySelectorAll('[data-pm-menu].is-open').forEach((m) => {
+      m.classList.remove('is-open');
+      const b = m.querySelector(':scope > button');
+      if (b) b.setAttribute('aria-expanded', 'false');
+    });
   }
-}
 
-function updateModalPreview() {
-  const titleInput = document.getElementById('modal-board-title');
-  const descInput = document.getElementById('modal-board-desc');
-  const iconSelect = document.getElementById('modal-board-icon');
-  const checkedColor = document.querySelector('input[name="color"]:checked');
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeMenus();
+      document.querySelectorAll('.card-modal-backdrop.is-open').forEach(closeModal);
+    }
+    const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+    if (!typing && e.key === '/' && search) { e.preventDefault(); search.focus(); search.select(); }
+  });
 
-  const previewCover = document.getElementById('preview-cover');
-  const previewIconBox = document.getElementById('preview-icon-box');
-  const previewTitle = document.getElementById('preview-title');
-  const previewDesc = document.getElementById('preview-desc');
-  const previewMethodologyChip = document.getElementById('preview-methodology-chip');
-
-  const color = checkedColor ? checkedColor.value : '#4F46E5';
-  const title = (titleInput && titleInput.value.trim()) || 'Titre du projet';
-  const desc = (descInput && descInput.value.trim()) || 'Description du projet...';
-  const icon = (iconSelect && iconSelect.value) || '🚀';
-
-  if (previewCover) previewCover.style.backgroundColor = color;
-  if (previewIconBox) {
-    previewIconBox.style.backgroundColor = color;
-    previewIconBox.textContent = icon;
+  /* ---------- New board live preview ---------- */
+  const modal = document.getElementById('new-board-modal');
+  if (modal) {
+    modal.addEventListener('change', () => {
+      const color = modal.querySelector('input[name="color"]:checked');
+      const icon = modal.querySelector('input[name="icon"]:checked');
+      const box = document.getElementById('preview-icon-box');
+      if (box && color) box.style.setProperty('--pm-board', color.value);
+      if (box && icon) box.textContent = icon.value;
+    });
   }
-  if (previewTitle) previewTitle.textContent = title;
-  if (previewDesc) previewDesc.textContent = desc;
 
-  if (previewMethodologyChip) {
-    previewMethodologyChip.className = 'project-methodology-chip methodology-hybrid';
-    previewMethodologyChip.textContent = '⚡ Hybride (Kanban • Scrum • Gantt)';
+  if (!grid) return;
+  const cards = () => Array.from(grid.querySelectorAll('.pm-board'));
+
+  /* ---------- Layout grid / list ---------- */
+  function setLayout(mode) {
+    grid.classList.toggle('is-list', mode === 'list');
+    document.querySelectorAll('[data-layout]').forEach((b) => b.classList.toggle('is-active', b.dataset.layout === mode));
+    try { localStorage.setItem(LAYOUT_KEY, mode); } catch (_) {}
   }
-}
+  document.querySelectorAll('[data-layout]').forEach((b) => b.addEventListener('click', () => setLayout(b.dataset.layout)));
+  let savedLayout = 'grid';
+  try { savedLayout = localStorage.getItem(LAYOUT_KEY) || 'grid'; } catch (_) {}
+  setLayout(savedLayout);
+
+  /* ---------- Sort ---------- */
+  function sortCards(mode) {
+    const newTile = grid.querySelector('.pm-board-new');
+    const list = cards();
+    list.sort((a, b) => {
+      if (mode === 'name') return a.dataset.title.localeCompare(b.dataset.title);
+      if (mode === 'progress') return (+b.dataset.progress) - (+a.dataset.progress);
+      return (b.dataset.updated || '').localeCompare(a.dataset.updated || '');
+    });
+    list.forEach((c) => grid.appendChild(c));
+    if (newTile) grid.appendChild(newTile);
+    try { localStorage.setItem(SORT_KEY, mode); } catch (_) {}
+  }
+  if (sortSel) {
+    try { sortSel.value = localStorage.getItem(SORT_KEY) || 'recent'; } catch (_) {}
+    sortSel.addEventListener('change', () => sortCards(sortSel.value));
+    sortCards(sortSel.value);
+  }
+
+  /* ---------- Instant client-side search ---------- */
+  function filter(q) {
+    q = (q || '').toLowerCase().trim();
+    let n = 0;
+    cards().forEach((c) => {
+      const ok = !q || c.dataset.title.includes(q) || c.dataset.desc.includes(q);
+      c.style.display = ok ? '' : 'none';
+      if (ok) n++;
+    });
+    const newTile = grid.querySelector('.pm-board-new');
+    if (newTile) newTile.style.display = q ? 'none' : '';
+    const empty = document.getElementById('no-match-alert');
+    if (empty) empty.style.display = n === 0 ? 'flex' : 'none';
+    grid.style.display = n === 0 ? 'none' : '';
+  }
+  if (search) search.addEventListener('input', () => filter(search.value));
+
+  if (search && search.value) filter(search.value);
+
+  window.pmBoards = {
+    clearSearch() {
+      if (search && search.defaultValue) { window.location.href = window.location.pathname; return; }
+      search.value = ''; filter(''); search.focus();
+    }
+  };
+})();
 </script>

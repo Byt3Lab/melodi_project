@@ -1,287 +1,187 @@
-<link rel="stylesheet" href="/static/melodi_project/css/kanban.css">
-<style>
-  .scrum-container {
-    display: flex;
-    gap: 1.5rem;
-    padding: 1.25rem 1.5rem;
-    min-height: calc(100vh - 80px);
-  }
-  .scrum-backlog-pane {
-    flex: 1;
-    min-width: 380px;
-    background: var(--ds-color-surface);
-    border: 1px solid var(--ds-color-border-subtle);
-    border-radius: var(--ds-radius-lg);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .scrum-sprints-pane {
-    flex: 1.5;
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-  }
-  .sprint-box {
-    background: var(--ds-color-surface);
-    border: 1px solid var(--ds-color-border-subtle);
-    border-radius: var(--ds-radius-lg);
-    padding: 1.25rem 1.5rem;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  }
-  .sprint-box.is-active {
-    border-color: var(--ds-color-primary);
-    box-shadow: 0 0 0 1px var(--ds-color-primary);
-  }
-  .sprint-box.drag-over {
-    border-color: var(--ds-color-primary);
-    background-color: var(--ds-color-surface-subtle);
-  }
-  .scrum-card-item {
-    background: var(--ds-color-surface);
-    border: 1px solid var(--ds-color-border-subtle);
-    border-radius: var(--ds-radius-md);
-    padding: 0.875rem 1.15rem;
-    margin-bottom: 0.625rem;
-    cursor: grab;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.875rem;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-  }
-  .scrum-card-item:hover {
-    border-color: var(--ds-color-primary);
-    box-shadow: var(--ds-shadow-sm);
-  }
-  .scrum-card-item.is-dragging {
-    opacity: 0.4;
-  }
-  .sp-badge {
-    background: var(--ds-color-surface-subtle);
-    border: 1px solid var(--ds-color-border-subtle);
-    border-radius: 9999px;
-    padding: 3px 9px;
-    font-size: 11px;
-    font-weight: 700;
-  }
-  .epic-badge {
-    padding: 3px 9px;
-    border-radius: 9999px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #fff;
-  }
-</style>
+{% macro ic(name, cls='') -%}
+<span class="pm-ic {{ cls }}" style="--pm-icon: url('/static_base_icons?name={{ name }}')" aria-hidden="true"></span>
+{%- endmacro %}
+{% set board_icon = board.icon if (board.icon and board.icon|length <= 3) else (board.title[:1]|upper) %}
+{% set epic_colors = ['#8B5CF6', '#4F46E5', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#64748B'] %}
 
-<div class="kanban-workspace">
-  <!-- Scrum Top Toolbar -->
-  <div class="kanban-toolbar">
-    <div class="ds-flex ds-items-center ds-gap-3">
-      <a href="/admin/melodi_project" class="ds-btn ds-btn-subtle ds-btn-sm">
-        ← {{ t('filter_all', 'Tableaux') }}
-      </a>
-      <div class="ds-flex ds-items-center ds-gap-2">
-        <span style="display: inline-block; width: 14px; height: 14px; border-radius: 4px; background-color: {{ board.color }};"></span>
-        <h2 class="ds-text-lg ds-font-bold ds-text-primary" style="margin: 0;">{{ board.title }}</h2>
-      </div>
+<div class="pm-app pm-page" style="--pm-board: {{ board.color or '#4F46E5' }}; padding-bottom: var(--ds-space-6);">
+  <div class="pm-board-shell">
 
-      <!-- View Switcher -->
-      <div class="ds-flex ds-gap-1" style="background-color: var(--ds-color-surface-subtle); padding: 2px; border-radius: var(--ds-radius-md);">
-        <a href="/admin/melodi_project/board?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs">
-          📊 {{ t('kanban_view', 'Kanban') }}
+    <!-- ===================== Board Header ===================== -->
+    <header class="pm-bh">
+      <div class="pm-bh-main">
+        <a href="/admin/melodi_project" class="pm-icon-btn pm-bh-back" title="{{ t('filter_all', 'Tous les projets') }}">
+          {{ ic('arrow_back', 'pm-ic-md') }}
         </a>
-        <span class="ds-btn ds-btn-primary ds-btn-xs">🏃 {{ t('scrum_view', 'Scrum') }}</span>
-        <a href="/admin/melodi_project/board/gantt?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs">
-          📅 {{ t('gantt_view', 'Gantt') }}
-        </a>
-        <a href="/admin/melodi_project/board/table?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs">
-          📋 {{ t('table_view', 'Table') }}
-        </a>
-      </div>
-    </div>
-
-    <!-- Actions -->
-    <div class="ds-flex ds-items-center ds-gap-2">
-      <button type="button" class="ds-btn ds-btn-outline ds-btn-xs" onclick="document.getElementById('new-epic-modal').classList.add('is-open');">
-        🏷️ {{ t('create_epic', 'Créer une Epic') }}
-      </button>
-      <button type="button" class="ds-btn ds-btn-primary ds-btn-xs" onclick="document.getElementById('new-sprint-modal').classList.add('is-open');">
-        ➕ {{ t('create_sprint', 'Nouveau Sprint') }}
-      </button>
-    </div>
-  </div>
-
-  <div class="scrum-container">
-    <!-- PRODUCT BACKLOG PANE -->
-    <div class="scrum-backlog-pane">
-      <div class="ds-p-4 ds-border-b ds-flex ds-items-center ds-justify-between" style="background: var(--ds-color-surface-subtle);">
+        <div class="pm-board-avatar" aria-hidden="true">{{ board_icon }}</div>
         <div>
-          <h3 class="ds-text-sm ds-font-bold ds-text-primary" style="margin: 0;">
-            📦 {{ t('product_backlog', 'Product Backlog') }}
-          </h3>
-          <span class="ds-text-xs ds-text-muted">
-            {{ backlog_cards|length }} {{ t('items', 'éléments') }} • {{ backlog_sp }} SP
-          </span>
+          <div class="pm-crumbs">
+            <a href="/admin/melodi_project">{{ t('projects_title', 'Projets') }}</a>
+            <span>/</span>
+            <span>{{ t('scrum_view', 'Scrum') }}</span>
+          </div>
+          <h1 class="pm-bh-title">{{ board.title }}</h1>
         </div>
-        <button type="button" class="ds-btn ds-btn-primary ds-btn-xs" onclick="document.getElementById('quick-add-story-modal').classList.add('is-open');">
-          + {{ t('add_story', 'Ajouter') }}
+      </div>
+
+      <div class="pm-bh-side">
+        <button type="button" class="ds-btn ds-btn-secondary ds-btn-sm" onclick="document.getElementById('new-epic-modal').classList.add('is-open');">
+          {{ ic('flag', 'pm-ic-sm') }} {{ t('create_epic', 'Créer une Epic') }}
+        </button>
+        <button type="button" class="ds-btn ds-btn-primary ds-btn-sm" onclick="document.getElementById('new-sprint-modal').classList.add('is-open');">
+          {{ ic('add', 'pm-ic-sm') }} {{ t('create_sprint', 'Nouveau Sprint') }}
         </button>
       </div>
 
-      <!-- Quick Add Story Form -->
-      <form id="js-backlog-quick-add" class="ds-p-3 ds-border-b ds-flex ds-gap-2">
-        <input type="text" name="title" class="ds-input ds-input-xs" placeholder="{{ t('story_title_placeholder', 'Titre de la user story...') }}" required style="flex: 1;">
-        <select name="story_points" class="ds-select ds-select-xs" style="width: 70px;">
-          <option value="">SP</option>
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="5">5</option>
-          <option value="8">8</option>
-          <option value="13">13</option>
-          <option value="21">21</option>
-        </select>
-        <button type="submit" class="ds-btn ds-btn-primary ds-btn-xs">OK</button>
-      </form>
+      <!-- Navigation Tabs -->
+      <nav class="pm-tabs" aria-label="{{ t('views', 'Vues') }}">
+        <a href="/admin/melodi_project/board?id={{ board.id }}" class="pm-tab">
+          {{ ic('view_kanban', 'pm-ic-sm') }} {{ t('kanban_view', 'Kanban') }}
+        </a>
+        <a href="/admin/melodi_project/board/scrum?id={{ board.id }}" class="pm-tab is-active" aria-current="page">
+          {{ ic('directions_run', 'pm-ic-sm') }} {{ t('scrum_view', 'Scrum') }}
+        </a>
+        <a href="/admin/melodi_project/board/gantt?id={{ board.id }}" class="pm-tab">
+          {{ ic('view_timeline', 'pm-ic-sm') }} {{ t('gantt_view', 'Gantt') }}
+        </a>
+        <a href="/admin/melodi_project/board/table?id={{ board.id }}" class="pm-tab">
+          {{ ic('table_rows', 'pm-ic-sm') }} {{ t('table_view', 'Table') }}
+        </a>
+      </nav>
+    </header>
 
-      <!-- Backlog Cards List (Drop target to return card to backlog) -->
-      <div id="backlog-cards-container" class="ds-p-3" style="flex: 1; overflow-y: auto;" data-sprint-id="">
-        {% if backlog_cards|length > 0 %}
-          {% for card in backlog_cards %}
-            <div class="scrum-card-item js-scrum-card" draggable="true" data-card-id="{{ card.id }}">
-              <div style="flex: 1;">
-                <div class="ds-flex ds-items-center ds-gap-2 ds-mb-1">
-                  {% if card.epic %}
-                    <span class="epic-badge" style="background-color: {{ card.epic.color }};">
-                      {{ card.epic.title }}
-                    </span>
-                  {% endif %}
-                  <span class="ds-text-xs ds-text-muted">#{{ card.id[:6] }}</span>
-                </div>
-                <div class="ds-text-sm ds-font-medium ds-text-primary" onclick="openCardDetailModal('{{ card.id }}')" style="cursor: pointer;">
-                  {{ card.title }}
-                </div>
-              </div>
-              <div class="ds-flex ds-items-center ds-gap-2">
-                {% if card.story_points %}
-                  <span class="sp-badge">{{ card.story_points }} SP</span>
-                {% endif %}
-                <span class="ds-badge ds-badge-{{ 'danger' if card.priority == 'urgent' else ('warning' if card.priority == 'high' else 'subtle') }} ds-text-xs">
-                  {{ card.priority|upper }}
-                </span>
-              </div>
-            </div>
+    <!-- ===================== Epics Sub-toolbar ===================== -->
+    <div class="pm-subbar">
+      <div class="pm-toolbar-group">
+        <span class="ds-text-xs ds-font-medium ds-text-muted">{{ ic('flag', 'pm-ic-sm') }} {{ t('total_epics', 'Epics') }} ({{ epics|length }}) :</span>
+        {% if epics and epics|length > 0 %}
+          {% for ep in epics %}
+            <span class="epic-badge" style="background-color: {{ ep.color }};">{{ ep.title }}</span>
           {% endfor %}
         {% else %}
-          <div class="ds-text-center ds-py-8 ds-text-muted ds-text-xs">
-            {{ t('backlog_empty', 'Le backlog est vide. Créez des user stories pour préparer vos sprints.') }}
-          </div>
+          <span class="ds-text-xs ds-text-muted">{{ t('no_epics_yet', 'Aucune epic définie') }}</span>
         {% endif %}
+      </div>
+
+      <div class="pm-toolbar-group ds-text-xs ds-text-muted">
+        <span>{{ t('product_backlog', 'Product Backlog') }} : <strong class="ds-text-primary">{{ backlog_cards|length }}</strong> {{ t('items', 'éléments') }} · <strong class="ds-text-primary">{{ backlog_sp }} SP</strong></span>
       </div>
     </div>
 
-    <!-- SPRINTS PANE -->
-    <div class="scrum-sprints-pane">
-      <!-- Active Sprint (if any) -->
-      {% if active_sprint %}
-        <div class="sprint-box is-active js-sprint-box" data-sprint-id="{{ active_sprint.id }}">
-          <div class="ds-flex ds-items-center ds-justify-between ds-mb-3">
+    <!-- ===================== Workspace Body ===================== -->
+    <div class="pm-view-body">
+      <div class="scrum-container">
+
+        <!-- PRODUCT BACKLOG PANE -->
+        <div class="scrum-backlog-pane">
+          <div class="ds-p-4 ds-border-b ds-flex ds-items-center ds-justify-between" style="background: var(--ds-color-surface-subtle);">
             <div>
-              <div class="ds-flex ds-items-center ds-gap-2">
-                <span class="ds-badge ds-badge-success ds-text-xs">● EN COURS</span>
-                <h3 class="ds-text-base ds-font-bold ds-text-primary" style="margin: 0;">{{ active_sprint.name }}</h3>
-              </div>
-              <p class="ds-text-xs ds-text-muted" style="margin: 4px 0 0 0;">
-                📅 {{ active_sprint.start_date.strftime('%d/%m/%Y') }} au {{ active_sprint.end_date.strftime('%d/%m/%Y') }}
-                {% if active_sprint.goal %} • <em>« {{ active_sprint.goal }} »</em>{% endif %}
-              </p>
-            </div>
-            <div class="ds-flex ds-items-center ds-gap-2">
-              <span class="sp-badge" style="background: var(--ds-color-primary-subtle); color: var(--ds-color-primary);">
-                {{ active_sprint.cards|length }} tâches • {{ active_sprint.total_story_points }} SP
+              <h3 class="ds-text-sm ds-font-bold ds-text-primary" style="margin: 0;">
+                {{ ic('view_list', 'pm-ic-sm') }} {{ t('product_backlog', 'Product Backlog') }}
+              </h3>
+              <span class="ds-text-xs ds-text-muted">
+                {{ backlog_cards|length }} {{ t('items', 'éléments') }} • {{ backlog_sp }} SP
               </span>
-              <button type="button" class="ds-btn ds-btn-success ds-btn-xs" onclick="completeSprint('{{ active_sprint.id }}')">
-                ✓ {{ t('complete_sprint', 'Terminer le Sprint') }}
-              </button>
             </div>
+            <button type="button" class="ds-btn ds-btn-secondary ds-btn-xs" onclick="document.querySelector('#js-backlog-quick-add input[name=title]')?.focus();">
+              {{ ic('add', 'pm-ic-sm') }} {{ t('add_story', 'Ajouter') }}
+            </button>
           </div>
 
-          <!-- Active Sprint Cards Container -->
-          <div class="sprint-cards-list js-sprint-cards-drop" data-sprint-id="{{ active_sprint.id }}" style="min-height: 80px;">
-            {% for card in active_sprint.cards %}
-              <div class="scrum-card-item js-scrum-card" draggable="true" data-card-id="{{ card.id }}">
-                <div style="flex: 1;">
-                  <div class="ds-flex ds-items-center ds-gap-2 ds-mb-1">
-                    {% if card.epic %}
-                      <span class="epic-badge" style="background-color: {{ card.epic.color }};">
-                        {{ card.epic.title }}
-                      </span>
-                    {% endif %}
-                    {% if card.is_completed %}
-                      <span class="ds-badge ds-badge-success ds-text-xs">✓ FAIT</span>
-                    {% endif %}
+          <!-- Quick Add Story Form -->
+          <form id="js-backlog-quick-add" class="ds-p-3 ds-border-b ds-flex ds-gap-2">
+            <input type="text" name="title" class="ds-input ds-input-xs" placeholder="{{ t('story_title_placeholder', 'Titre de la user story...') }}" required style="flex: 1;">
+            <select name="story_points" class="ds-select ds-select-xs" style="width: 72px;">
+              <option value="">SP</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="5">5</option>
+              <option value="8">8</option>
+              <option value="13">13</option>
+              <option value="21">21</option>
+            </select>
+            <button type="submit" class="ds-btn ds-btn-primary ds-btn-xs">OK</button>
+          </form>
+
+          <!-- Backlog Cards List (Drop target to return card to backlog) -->
+          <div id="backlog-cards-container" class="ds-p-3" style="flex: 1; overflow-y: auto;" data-sprint-id="">
+            {% if backlog_cards|length > 0 %}
+              {% for card in backlog_cards %}
+                <div class="scrum-card-item js-scrum-card" draggable="true" data-card-id="{{ card.id }}">
+                  <div style="flex: 1; min-width: 0;">
+                    <div class="ds-flex ds-items-center ds-gap-2 ds-mb-1">
+                      {% if card.epic %}
+                        <span class="epic-badge" style="background-color: {{ card.epic.color }};">
+                          {{ card.epic.title }}
+                        </span>
+                      {% endif %}
+                      <span class="ds-text-xs ds-text-muted">#{{ card.id[:6] }}</span>
+                    </div>
+                    <div class="ds-text-sm ds-font-medium ds-text-primary" onclick="openCardDetailModal('{{ card.id }}')" style="cursor: pointer;">
+                      {{ card.title }}
+                    </div>
                   </div>
-                  <div class="ds-text-sm ds-font-medium {% if card.is_completed %}ds-text-muted{% else %}ds-text-primary{% endif %}" onclick="openCardDetailModal('{{ card.id }}')" style="cursor: pointer; {% if card.is_completed %}text-decoration: line-through;{% endif %}">
-                    {{ card.title }}
+                  <div class="ds-flex ds-items-center ds-gap-2">
+                    {% if card.story_points %}
+                      <span class="sp-badge">{{ card.story_points }} SP</span>
+                    {% endif %}
+                    <span class="ds-badge ds-badge-{{ 'danger' if card.priority == 'urgent' else ('warning' if card.priority == 'high' else 'subtle') }} ds-badge-xs">
+                      {{ card.priority|upper }}
+                    </span>
                   </div>
                 </div>
-                <div class="ds-flex ds-items-center ds-gap-2">
-                  {% if card.story_points %}
-                    <span class="sp-badge">{{ card.story_points }} SP</span>
-                  {% endif %}
-                </div>
+              {% endfor %}
+            {% else %}
+              <div class="ds-text-center ds-py-8 ds-text-muted ds-text-xs">
+                {{ t('backlog_empty', 'Le backlog est vide. Créez des user stories pour préparer vos sprints.') }}
               </div>
-            {% endfor %}
+            {% endif %}
           </div>
         </div>
-      {% endif %}
 
-      <!-- Planned Sprints -->
-      <div class="ds-flex ds-items-center ds-justify-between ds-mt-2">
-        <h4 class="ds-text-xs ds-font-bold ds-text-muted" style="text-transform: uppercase;">
-          {{ t('planned_sprints', 'Sprints Planifiés') }}
-        </h4>
-      </div>
-
-      {% for sp in sprints %}
-        {% if sp.status.value != 'active' and sp.status.value != 'completed' %}
-          <div class="sprint-box js-sprint-box" data-sprint-id="{{ sp.id }}">
-            <div class="ds-flex ds-items-center ds-justify-between ds-mb-2">
-              <div>
-                <h4 class="ds-text-sm ds-font-bold ds-text-primary" style="margin: 0;">{{ sp.name }}</h4>
-                <span class="ds-text-xs ds-text-muted">
-                  📅 {{ sp.start_date.strftime('%d/%m/%Y') }} au {{ sp.end_date.strftime('%d/%m/%Y') }}
-                  {% if sp.goal %} • <em>« {{ sp.goal }} »</em>{% endif %}
-                </span>
-              </div>
-              <div class="ds-flex ds-items-center ds-gap-2">
-                <span class="sp-badge">{{ sp.cards|length }} tâches • {{ sp.total_story_points }} SP</span>
-                {% if not active_sprint %}
-                  <button type="button" class="ds-btn ds-btn-primary ds-btn-xs" onclick="startSprint('{{ sp.id }}')">
-                    ▶ {{ t('start_sprint', 'Démarrer') }}
+        <!-- SPRINTS PANE -->
+        <div class="scrum-sprints-pane">
+          <!-- Active Sprint (if any) -->
+          {% if active_sprint %}
+            <div class="sprint-box is-active js-sprint-box" data-sprint-id="{{ active_sprint.id }}">
+              <div class="ds-flex ds-items-center ds-justify-between ds-flex-wrap ds-gap-2 ds-mb-3">
+                <div>
+                  <div class="ds-flex ds-items-center ds-gap-2">
+                    <span class="ds-badge ds-badge-success ds-badge-xs"><span class="pm-pulse" style="margin-right: 4px;"></span> {{ t('active_status', 'EN COURS') }}</span>
+                    <h3 class="ds-text-base ds-font-bold ds-text-primary" style="margin: 0;">{{ active_sprint.name }}</h3>
+                  </div>
+                  <p class="ds-text-xs ds-text-muted" style="margin: 4px 0 0 0;">
+                    {{ ic('calendar_today', 'pm-ic-sm') }} {{ active_sprint.start_date.strftime('%d/%m/%Y') }} — {{ active_sprint.end_date.strftime('%d/%m/%Y') }}
+                    {% if active_sprint.goal %} • <em>« {{ active_sprint.goal }} »</em>{% endif %}
+                  </p>
+                </div>
+                <div class="ds-flex ds-items-center ds-gap-2">
+                  <span class="sp-badge" style="background: var(--ds-color-primary-subtle); color: var(--ds-color-primary);">
+                    {{ active_sprint.cards|length }} {{ t('tasks', 'tâches') }} • {{ active_sprint.total_story_points }} SP
+                  </span>
+                  <button type="button" class="ds-btn ds-btn-success ds-btn-xs" onclick="completeSprint('{{ active_sprint.id }}')">
+                    {{ ic('check_circle', 'pm-ic-sm') }} {{ t('complete_sprint', 'Terminer le Sprint') }}
                   </button>
-                {% endif %}
-                <button type="button" class="ds-btn ds-btn-subtle ds-btn-xs" onclick="deleteSprint('{{ sp.id }}')" title="{{ t('delete', 'Supprimer') }}">
-                  🗑
-                </button>
+                </div>
               </div>
-            </div>
 
-            <!-- Sprint Drop Target -->
-            <div class="sprint-cards-list js-sprint-cards-drop" data-sprint-id="{{ sp.id }}" style="min-height: 50px; background: var(--ds-color-surface-subtle); border-radius: var(--ds-radius-md); padding: var(--ds-space-2);">
-              {% if sp.cards|length > 0 %}
-                {% for card in sp.cards %}
+              <!-- Active Sprint Cards Container -->
+              <div class="sprint-cards-list js-sprint-cards-drop" data-sprint-id="{{ active_sprint.id }}" style="min-height: 80px;">
+                {% for card in active_sprint.cards %}
                   <div class="scrum-card-item js-scrum-card" draggable="true" data-card-id="{{ card.id }}">
-                    <div style="flex: 1;">
+                    <div style="flex: 1; min-width: 0;">
                       <div class="ds-flex ds-items-center ds-gap-2 ds-mb-1">
                         {% if card.epic %}
                           <span class="epic-badge" style="background-color: {{ card.epic.color }};">
                             {{ card.epic.title }}
                           </span>
                         {% endif %}
+                        {% if card.is_completed %}
+                          <span class="ds-badge ds-badge-success ds-badge-xs">{{ ic('check_circle', 'pm-ic-sm') }} {{ t('done_short', 'FAIT') }}</span>
+                        {% endif %}
                       </div>
-                      <div class="ds-text-sm ds-font-medium ds-text-primary" onclick="openCardDetailModal('{{ card.id }}')" style="cursor: pointer;">
+                      <div class="ds-text-sm ds-font-medium {% if card.is_completed %}ds-text-muted{% else %}ds-text-primary{% endif %}" onclick="openCardDetailModal('{{ card.id }}')" style="cursor: pointer; {% if card.is_completed %}text-decoration: line-through;{% endif %}">
                         {{ card.title }}
                       </div>
                     </div>
@@ -292,48 +192,126 @@
                     </div>
                   </div>
                 {% endfor %}
-              {% else %}
-                <div class="ds-text-center ds-py-3 ds-text-muted ds-text-xs">
-                  {{ t('drag_here_to_plan', 'Glissez des user stories ici pour planifier ce sprint.') }}
-                </div>
-              {% endif %}
+              </div>
             </div>
+          {% endif %}
+
+          <!-- Planned Sprints -->
+          <div class="ds-flex ds-items-center ds-justify-between ds-mt-1">
+            <h4 class="ds-text-xs ds-font-bold ds-text-muted" style="text-transform: uppercase; margin: 0;">
+              {{ t('planned_sprints', 'Sprints Planifiés') }}
+            </h4>
           </div>
-        {% endif %}
-      {% endfor %}
+
+          {% set planned_count = namespace(value=0) %}
+          {% for sp in sprints %}
+            {% if sp.status.value != 'active' and sp.status.value != 'completed' %}
+              {% set planned_count.value = planned_count.value + 1 %}
+              <div class="sprint-box js-sprint-box" data-sprint-id="{{ sp.id }}">
+                <div class="ds-flex ds-items-center ds-justify-between ds-flex-wrap ds-gap-2 ds-mb-3">
+                  <div>
+                    <h4 class="ds-text-sm ds-font-bold ds-text-primary" style="margin: 0;">{{ sp.name }}</h4>
+                    <span class="ds-text-xs ds-text-muted">
+                      {{ ic('calendar_today', 'pm-ic-sm') }} {{ sp.start_date.strftime('%d/%m/%Y') }} — {{ sp.end_date.strftime('%d/%m/%Y') }}
+                      {% if sp.goal %} • <em>« {{ sp.goal }} »</em>{% endif %}
+                    </span>
+                  </div>
+                  <div class="ds-flex ds-items-center ds-gap-2">
+                    <span class="sp-badge">{{ sp.cards|length }} {{ t('tasks', 'tâches') }} • {{ sp.total_story_points }} SP</span>
+                    {% if not active_sprint %}
+                      <button type="button" class="ds-btn ds-btn-primary ds-btn-xs" onclick="startSprint('{{ sp.id }}')">
+                        {{ ic('directions_run', 'pm-ic-sm') }} {{ t('start_sprint', 'Démarrer') }}
+                      </button>
+                    {% endif %}
+                    <button type="button" class="pm-icon-btn pm-icon-btn--danger" onclick="deleteSprint('{{ sp.id }}')" title="{{ t('delete', 'Supprimer') }}">
+                      {{ ic('delete', 'pm-ic-sm') }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Sprint Drop Target -->
+                <div class="sprint-cards-list js-sprint-cards-drop" data-sprint-id="{{ sp.id }}" style="min-height: 56px; background: var(--ds-color-surface-subtle); border: 1px dashed var(--ds-color-border); border-radius: var(--ds-radius-md); padding: var(--ds-space-2);">
+                  {% if sp.cards|length > 0 %}
+                    {% for card in sp.cards %}
+                      <div class="scrum-card-item js-scrum-card" draggable="true" data-card-id="{{ card.id }}">
+                        <div style="flex: 1; min-width: 0;">
+                          <div class="ds-flex ds-items-center ds-gap-2 ds-mb-1">
+                            {% if card.epic %}
+                              <span class="epic-badge" style="background-color: {{ card.epic.color }};">
+                                {{ card.epic.title }}
+                              </span>
+                            {% endif %}
+                          </div>
+                          <div class="ds-text-sm ds-font-medium ds-text-primary" onclick="openCardDetailModal('{{ card.id }}')" style="cursor: pointer;">
+                            {{ card.title }}
+                          </div>
+                        </div>
+                        <div class="ds-flex ds-items-center ds-gap-2">
+                          {% if card.story_points %}
+                            <span class="sp-badge">{{ card.story_points }} SP</span>
+                          {% endif %}
+                        </div>
+                      </div>
+                    {% endfor %}
+                  {% else %}
+                    <div class="ds-text-center ds-py-3 ds-text-muted ds-text-xs">
+                      {{ t('drag_here_to_plan', 'Glissez des user stories ici pour planifier ce sprint.') }}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            {% endif %}
+          {% endfor %}
+
+          {% if planned_count.value == 0 and not active_sprint %}
+            <div class="pm-empty" style="padding: var(--ds-space-8);">
+              <div class="pm-empty-icon">{{ ic('directions_run', 'pm-ic-lg') }}</div>
+              <h3>{{ t('no_sprints_title', 'Aucun sprint planifié') }}</h3>
+              <p>{{ t('no_sprints_desc', 'Créez un sprint puis glissez-y les user stories depuis le Product Backlog.') }}</p>
+              <button type="button" class="ds-btn ds-btn-primary ds-btn-sm" onclick="document.getElementById('new-sprint-modal').classList.add('is-open');">
+                {{ ic('add', 'pm-ic-sm') }} {{ t('create_sprint', 'Nouveau Sprint') }}
+              </button>
+            </div>
+          {% endif %}
+        </div>
+
+      </div>
     </div>
+
   </div>
 </div>
 
 <!-- Modal Nouveau Sprint -->
-<div id="new-sprint-modal" class="card-modal-backdrop">
+<div id="new-sprint-modal" class="card-modal-backdrop pm-app">
   <div class="card-modal-container" style="max-width: 480px;">
     <div class="card-modal-header">
       <h3 class="ds-text-base ds-font-bold ds-text-primary" style="margin: 0;">{{ t('new_sprint_title', 'Créer un nouveau Sprint') }}</h3>
-      <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm" onclick="document.getElementById('new-sprint-modal').classList.remove('is-open');">✕</button>
+      <button type="button" class="pm-icon-btn" onclick="document.getElementById('new-sprint-modal').classList.remove('is-open');">{{ ic('close', 'pm-ic-md') }}</button>
     </div>
-    <form id="create-sprint-form" class="ds-p-4">
+    <form id="create-sprint-form">
       <input type="hidden" name="board_id" value="{{ board.id }}">
-      <div class="ds-mb-3">
-        <label class="ds-label ds-text-xs ds-font-bold">{{ t('sprint_name', 'Nom du Sprint') }}</label>
-        <input type="text" name="name" class="ds-input" placeholder="Sprint 1" required>
-      </div>
-      <div class="ds-mb-3">
-        <label class="ds-label ds-text-xs ds-font-bold">{{ t('sprint_goal', 'Objectif du Sprint') }}</label>
-        <textarea name="goal" class="ds-textarea" rows="2" placeholder="Ex: Livraison de la version MVP..."></textarea>
-      </div>
-      <div class="ds-grid ds-grid-cols-2 ds-gap-3 ds-mb-4">
-        <div>
-          <label class="ds-label ds-text-xs ds-font-bold">{{ t('start_date', 'Date de début') }}</label>
-          <input type="date" name="start_date" class="ds-input" required>
+      <div class="ds-p-6">
+        <div class="pm-field">
+          <label class="ds-label">{{ t('sprint_name', 'Nom du Sprint') }} <span class="pm-required">*</span></label>
+          <input type="text" name="name" class="ds-input" placeholder="Sprint 1" required>
         </div>
-        <div>
-          <label class="ds-label ds-text-xs ds-font-bold">{{ t('end_date', 'Date de fin') }}</label>
-          <input type="date" name="end_date" class="ds-input" required>
+        <div class="pm-field">
+          <label class="ds-label">{{ t('sprint_goal', 'Objectif du Sprint') }}</label>
+          <textarea name="goal" class="ds-textarea" rows="2" placeholder="Ex: Livraison de la version MVP..."></textarea>
+        </div>
+        <div class="pm-field-row">
+          <div>
+            <label class="ds-label">{{ t('start_date', 'Date de début') }} <span class="pm-required">*</span></label>
+            <input type="date" name="start_date" class="ds-input" required>
+          </div>
+          <div>
+            <label class="ds-label">{{ t('end_date', 'Date de fin') }} <span class="pm-required">*</span></label>
+            <input type="date" name="end_date" class="ds-input" required>
+          </div>
         </div>
       </div>
-      <div class="ds-flex ds-justify-end ds-gap-2">
-        <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm" onclick="document.getElementById('new-sprint-modal').classList.remove('is-open');">{{ t('cancel', 'Annuler') }}</button>
+      <div class="ds-p-4 ds-border-t ds-flex ds-justify-end ds-gap-2" style="background-color: var(--ds-color-surface-subtle);">
+        <button type="button" class="ds-btn ds-btn-secondary ds-btn-sm" onclick="document.getElementById('new-sprint-modal').classList.remove('is-open');">{{ t('cancel', 'Annuler') }}</button>
         <button type="submit" class="ds-btn ds-btn-primary ds-btn-sm">{{ t('save', 'Créer le sprint') }}</button>
       </div>
     </form>
@@ -341,58 +319,67 @@
 </div>
 
 <!-- Modal Nouvelle Epic -->
-<div id="new-epic-modal" class="card-modal-backdrop">
+<div id="new-epic-modal" class="card-modal-backdrop pm-app">
   <div class="card-modal-container" style="max-width: 480px;">
     <div class="card-modal-header">
       <h3 class="ds-text-base ds-font-bold ds-text-primary" style="margin: 0;">{{ t('new_epic_title', 'Créer une Epic') }}</h3>
-      <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm" onclick="document.getElementById('new-epic-modal').classList.remove('is-open');">✕</button>
+      <button type="button" class="pm-icon-btn" onclick="document.getElementById('new-epic-modal').classList.remove('is-open');">{{ ic('close', 'pm-ic-md') }}</button>
     </div>
-    <form id="create-epic-form" class="ds-p-4">
+    <form id="create-epic-form">
       <input type="hidden" name="board_id" value="{{ board.id }}">
-      <div class="ds-mb-3">
-        <label class="ds-label ds-text-xs ds-font-bold">{{ t('epic_title', 'Titre de l\'Epic') }}</label>
-        <input type="text" name="title" class="ds-input" placeholder="Ex: Refonte Paiements..." required>
+      <div class="ds-p-6">
+        <div class="pm-field">
+          <label class="ds-label">{{ t('epic_title', 'Titre de l\'Epic') }} <span class="pm-required">*</span></label>
+          <input type="text" name="title" class="ds-input" placeholder="Ex: Refonte Paiements..." required>
+        </div>
+        <div class="pm-field">
+          <label class="ds-label">{{ t('epic_color', 'Couleur') }}</label>
+          <div class="color-swatch-list">
+            {% for col in epic_colors %}
+              <label class="color-swatch-option" title="{{ col }}">
+                <input type="radio" name="color" value="{{ col }}" {% if loop.first %}checked{% endif %}>
+                <span class="color-swatch-box" style="background: {{ col }};"></span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="pm-field" style="margin-bottom: 0;">
+          <label class="ds-label">{{ t('epic_description', 'Description') }}</label>
+          <textarea name="description" class="ds-textarea" rows="2"></textarea>
+        </div>
       </div>
-      <div class="ds-mb-3">
-        <label class="ds-label ds-text-xs ds-font-bold">{{ t('epic_color', 'Couleur') }}</label>
-        <input type="color" name="color" class="ds-input" value="#8B5CF6" style="height: 38px; padding: 2px;">
-      </div>
-      <div class="ds-mb-4">
-        <label class="ds-label ds-text-xs ds-font-bold">{{ t('epic_description', 'Description') }}</label>
-        <textarea name="description" class="ds-textarea" rows="2"></textarea>
-      </div>
-      <div class="ds-flex ds-justify-end ds-gap-2">
-        <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm" onclick="document.getElementById('new-epic-modal').classList.remove('is-open');">{{ t('cancel', 'Annuler') }}</button>
+      <div class="ds-p-4 ds-border-t ds-flex ds-justify-end ds-gap-2" style="background-color: var(--ds-color-surface-subtle);">
+        <button type="button" class="ds-btn ds-btn-secondary ds-btn-sm" onclick="document.getElementById('new-epic-modal').classList.remove('is-open');">{{ t('cancel', 'Annuler') }}</button>
         <button type="submit" class="ds-btn ds-btn-primary ds-btn-sm">{{ t('save', 'Créer l\'Epic') }}</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- Modal de détail de carte Trello-Style -->
-<div id="card-detail-modal" class="card-modal-backdrop">
+<!-- Modal de détail de carte -->
+<div id="card-detail-modal" class="card-modal-backdrop pm-app">
   <div class="card-modal-container">
     <div class="card-modal-header">
       <div style="flex: 1;">
         <div class="ds-flex ds-items-center ds-gap-2 ds-mb-1">
           <span id="modal-card-priority" class="ds-badge ds-badge-primary">NORMAL</span>
-          <span class="ds-text-xs ds-text-muted">Échéance: <strong id="modal-card-due-date">-</strong></span>
+          <span class="ds-text-xs ds-text-muted">{{ t('due_date', 'Échéance') }}: <strong id="modal-card-due-date">-</strong></span>
         </div>
         <h3 id="modal-card-title" class="ds-text-lg ds-font-bold ds-text-primary" style="margin: 0;"></h3>
       </div>
-      <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm js-close-modal" title="{{ t('close', 'Fermer') }}">✕</button>
+      <button type="button" class="pm-icon-btn js-close-modal" title="{{ t('close', 'Fermer') }}">{{ ic('close', 'pm-ic-md') }}</button>
     </div>
 
     <div class="card-modal-body">
       <!-- Main Column -->
       <div>
         <!-- Scrum & Gantt Context Row -->
-        <div class="ds-flex ds-items-center ds-gap-2 ds-mb-3 ds-p-2 ds-border ds-rounded-md" style="background-color: var(--ds-color-surface-subtle); font-size: 0.8rem;">
-          <span id="modal-card-sprint-badge" class="ds-badge ds-badge-subtle">🏃 Backlog</span>
+        <div class="ds-flex ds-items-center ds-gap-2 ds-mb-3 ds-p-2 ds-border ds-rounded-md" style="background-color: var(--ds-color-surface-subtle); font-size: var(--ds-font-size-xs);">
+          <span id="modal-card-sprint-badge" class="ds-badge ds-badge-subtle">Backlog</span>
           <span id="modal-card-epic-badge" class="ds-badge ds-badge-subtle" style="display: none;"></span>
           <span id="modal-card-sp-badge" class="ds-badge ds-badge-secondary" style="display: none;"></span>
-          <span id="modal-card-milestone-badge" class="ds-badge ds-badge-warning" style="display: none;">🔶 Jalon</span>
-          <span class="ds-text-muted" style="margin-left: auto;">Avancement: <strong id="modal-card-progress">0%</strong></span>
+          <span id="modal-card-milestone-badge" class="ds-badge ds-badge-warning" style="display: none;">◆ {{ t('milestone', 'Jalon') }}</span>
+          <span class="ds-text-muted" style="margin-left: auto;">{{ t('progress_label', 'Progression') }}: <strong id="modal-card-progress">0%</strong></span>
         </div>
 
         <!-- Labels & Members Quick summary -->
@@ -410,7 +397,7 @@
         <!-- Description -->
         <div class="ds-mb-6">
           <div class="card-modal-section-title">
-            <span>📝</span> {{ t('board_description', 'Description') }}
+            {{ ic('edit', 'pm-ic-sm') }} {{ t('board_description', 'Description') }}
           </div>
           <div id="modal-card-desc" class="ds-p-3 ds-border ds-rounded-md ds-text-sm" style="background-color: var(--ds-color-surface-subtle); white-space: pre-wrap; min-height: 60px;"></div>
         </div>
@@ -423,7 +410,7 @@
         <!-- Comments & Activity -->
         <div class="ds-mb-4">
           <div class="card-modal-section-title">
-            <span>💬</span> {{ t('comments', 'Commentaires') }}
+            {{ ic('chat_bubble', 'pm-ic-sm') }} {{ t('comments', 'Commentaires') }}
           </div>
           <form id="modal-comment-form" class="ds-mb-3">
             <textarea class="ds-textarea ds-mb-2" rows="2" placeholder="{{ t('add_comment', 'Écrire un commentaire...') }}" required style="width: 100%;"></textarea>
@@ -438,13 +425,13 @@
         <div class="ds-text-xs ds-font-bold ds-text-muted ds-mb-2" style="text-transform: uppercase;">{{ t('actions', 'Actions') }}</div>
         <div class="ds-flex ds-flex-col ds-gap-2">
           <button type="button" id="js-toggle-complete-card" class="ds-btn ds-btn-outline ds-btn-sm" style="width: 100%; justify-content: flex-start;">
-            ✓ {{ t('mark_completed', 'Terminer / Rouvrir') }}
+            {{ ic('check_circle', 'pm-ic-sm') }} {{ t('mark_completed', 'Terminer / Rouvrir') }}
           </button>
           <button type="button" id="js-add-checklist-trigger" class="ds-btn ds-btn-outline ds-btn-sm" style="width: 100%; justify-content: flex-start;">
-            ☑ {{ t('add_checklist', 'Ajouter une checklist') }}
+            {{ ic('checklist', 'pm-ic-sm') }} {{ t('add_checklist', 'Ajouter une checklist') }}
           </button>
           <button type="button" id="js-delete-card-trigger" class="ds-btn ds-btn-danger ds-btn-sm" style="width: 100%; justify-content: flex-start; margin-top: var(--ds-space-4);">
-            🗑 {{ t('delete', 'Supprimer la carte') }}
+            {{ ic('delete', 'pm-ic-sm') }} {{ t('delete', 'Supprimer la carte') }}
           </button>
         </div>
       </div>

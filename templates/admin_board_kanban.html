@@ -1,291 +1,331 @@
-<link rel="stylesheet" href="/static/melodi_project/css/kanban.css">
+{% macro ic(name, cls='') -%}
+<span class="pm-ic {{ cls }}" style="--pm-icon: url('/static_base_icons?name={{ name }}')" aria-hidden="true"></span>
+{%- endmacro %}
+{% set board_icon = board.icon if (board.icon and board.icon|length <= 3) else (board.title[:1]|upper) %}
 
-<div class="kanban-workspace">
-  <!-- Kanban Top Toolbar -->
-  <div class="kanban-toolbar">
-    <div class="ds-flex ds-items-center ds-gap-3">
-      <a href="/admin/melodi_project" class="ds-btn ds-btn-subtle ds-btn-sm" title="{{ t('projects_title', 'Tous les Tableaux') }}">
-        ← {{ t('filter_all', 'Tableaux') }}
-      </a>
-      <div class="ds-flex ds-items-center ds-gap-2">
-        <span style="display: inline-block; width: 14px; height: 14px; border-radius: 4px; background-color: {{ board.color }};"></span>
-        <h2 class="ds-text-lg ds-font-bold ds-text-primary" style="margin: 0;">{{ board.title }}</h2>
+<div class="pm-app pm-page" style="--pm-board: {{ board.color or '#4F46E5' }}; padding-bottom: var(--ds-space-6);">
+  <div class="pm-board-shell">
+
+    <!-- ===================== Board Header ===================== -->
+    <header class="pm-bh">
+      <div class="pm-bh-main">
+        <a href="/admin/melodi_project" class="pm-icon-btn pm-bh-back" title="{{ t('filter_all', 'Tous les projets') }}">
+          {{ ic('arrow_back', 'pm-ic-md') }}
+        </a>
+        <div class="pm-board-avatar" aria-hidden="true">{{ board_icon }}</div>
+        <div>
+          <div class="pm-crumbs">
+            <a href="/admin/melodi_project">{{ t('projects_title', 'Projets') }}</a>
+            <span>/</span>
+            <span>{{ t('kanban_view', 'Kanban') }}</span>
+          </div>
+          <h1 class="pm-bh-title">{{ board.title }}</h1>
+        </div>
       </div>
 
-      <!-- View Switcher -->
-      <div class="ds-flex ds-gap-1" style="background-color: var(--ds-color-surface-subtle); padding: 2px; border-radius: var(--ds-radius-md);">
-        <span class="ds-btn ds-btn-primary ds-btn-xs">📊 {{ t('kanban_view', 'Kanban') }}</span>
-        <a href="/admin/melodi_project/board/scrum?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs">
-          🏃 {{ t('scrum_view', 'Scrum') }}
-        </a>
-        <a href="/admin/melodi_project/board/gantt?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs">
-          📅 {{ t('gantt_view', 'Gantt') }}
-        </a>
-        <a href="/admin/melodi_project/board/table?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs">
-          📋 {{ t('table_view', 'Table') }}
-        </a>
-      </div>
-    </div>
-
-    <!-- Filter & Search Controls -->
-    <div class="ds-flex ds-items-center ds-flex-wrap ds-gap-2">
-      <input type="text" id="kanban-search-input" class="ds-input ds-input-xs" placeholder="{{ t('search_placeholder', 'Rechercher...') }}" style="width: 140px;">
-
-      <select id="kanban-filter-priority" class="ds-select ds-select-xs" style="width: 110px;">
-        <option value="">{{ t('all_priorities', 'Priorités') }}</option>
-        <option value="urgent">{{ t('priority_urgent', 'Urgente') }}</option>
-        <option value="high">{{ t('priority_high', 'Haute') }}</option>
-        <option value="medium">{{ t('priority_medium', 'Moyenne') }}</option>
-        <option value="low">{{ t('priority_low', 'Basse') }}</option>
-      </select>
-
-      <select id="kanban-filter-label" class="ds-select ds-select-xs" style="width: 110px;">
-        <option value="">{{ t('all_labels', 'Étiquettes') }}</option>
-        {% for lbl in labels %}
-          <option value="{{ lbl.name }}">{{ lbl.name }}</option>
-        {% endfor %}
-      </select>
-
-      <select id="kanban-filter-member" class="ds-select ds-select-xs" style="width: 120px;">
-        <option value="">{{ t('all_members', 'Membres') }}</option>
-        {% for m in project_members %}
-          <option value="{{ m.user_id }}">{{ m.user_info.name if m.user_info is defined and m.user_info.name else m.user_id }}</option>
-        {% endfor %}
-      </select>
-
-      <button type="button" class="ds-btn ds-btn-subtle ds-btn-xs" onclick="openProjectMembersModal();" title="{{ t('project_members', 'Membres du Projet') }}">
-        👥 {{ t('project_members', 'Membres') }} (<span id="project-members-count-badge">{{ project_members|length }}</span>)
-      </button>
-
-      <!-- Sprint Selector -->
-      <select id="kanban-filter-sprint" class="ds-select ds-select-xs" style="width: 140px;" onchange="window.location.href='/admin/melodi_project/board?id={{ board.id }}' + (this.value ? '&sprint_id=' + this.value : '');">
-        <option value="">🏃 {{ t('all_sprints', 'Tous les Sprints') }}</option>
-        {% for sp in sprints %}
-          <option value="{{ sp.id }}" {% if selected_sprint_id == sp.id %}selected{% endif %}>
-            {{ sp.name }} ({{ sp.status.value }})
-          </option>
-        {% endfor %}
-      </select>
-
-      <button type="button" class="ds-btn ds-btn-primary ds-btn-xs" onclick="document.getElementById('new-column-modal').classList.add('is-open');">
-        + {{ t('add_list', 'Colonne') }}
-      </button>
-    </div>
-  </div>
-
-  {% if selected_sprint %}
-  <div class="ds-flex ds-items-center ds-justify-between ds-p-2" style="margin: 0.5rem 1rem 0; background: var(--ds-color-primary-subtle, rgba(0, 102, 204, 0.08)); border: 1px solid var(--ds-color-primary); border-radius: var(--ds-radius-md); font-size: 0.85rem;">
-    <div class="ds-flex ds-items-center ds-gap-2">
-      <span class="ds-badge ds-badge-primary">🏃 {{ selected_sprint.name }}</span>
-      <span class="ds-text-secondary">{{ selected_sprint.start_date.strftime('%d/%m/%Y') }} - {{ selected_sprint.end_date.strftime('%d/%m/%Y') }}</span>
-      <span class="ds-badge ds-badge-secondary">{{ selected_sprint.velocity_achieved }}/{{ selected_sprint.total_story_points }} SP ({{ selected_sprint.progress_percent }}%)</span>
-      {% if selected_sprint.goal %}
-        <span class="ds-text-muted" style="font-style: italic;">— "{{ selected_sprint.goal }}"</span>
-      {% endif %}
-    </div>
-    <a href="/admin/melodi_project/board?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs" style="color: var(--ds-color-danger, #ef4444);">
-      ✕ {{ t('clear_filter', 'Voir tout le tableau') }}
-    </a>
-  </div>
-  {% endif %}
-
-  <!-- Kanban Canvas (Horizontally Scrollable) -->
-  <div class="kanban-canvas" id="kanban-board-canvas">
-    {% for lst in board.lists %}
-      <div class="kanban-column" data-list-id="{{ lst.id }}">
-        <!-- Column Header -->
-        <div class="kanban-column-header">
-          {% set c_type = lst.column_type.value if lst.column_type.value is defined else lst.column_type %}
-          <div class="kanban-column-title">
-            <span>{{ lst.title }}</span>
-            <span class="kanban-column-badge">{{ lst.cards|length }}</span>
-            {% if c_type == 'entry' %}
-              <span class="ds-badge ds-badge-subtle ds-text-xs" style="font-size: 0.65rem; padding: 2px 6px;" title="{{ t('column_type_entry_desc', 'Colonne initiale obligatoire (0%)') }}">📥 {{ t('column_type_entry', 'Début') }}</span>
-            {% elif c_type == 'done' %}
-              <span class="ds-badge ds-badge-success ds-text-xs" style="font-size: 0.65rem; padding: 2px 6px;" title="{{ t('column_type_done_desc', 'Colonne de succès obligatoire (100%)') }}">✅ {{ t('column_type_done', 'Fini') }}</span>
-            {% elif c_type == 'cancelled' %}
-              <span class="ds-badge ds-badge-danger ds-text-xs" style="font-size: 0.65rem; padding: 2px 6px;" title="{{ t('column_type_cancelled_desc', 'Colonne d\'abandon obligatoire (0%)') }}">🚫 {{ t('column_type_cancelled', 'Annulé') }}</span>
-            {% else %}
-              <span class="ds-badge ds-badge-primary ds-text-xs" style="font-size: 0.65rem; padding: 2px 6px;" title="{{ t('column_type_in_progress_desc', 'Étape intermédiaire') }}">⏳ {{ t('column_type_in_progress', 'En cours') }}</span>
+      <div class="pm-bh-side">
+        <div class="pm-avatars">
+          {% if project_members and project_members|length > 0 %}
+            {% for m in project_members[:4] %}
+              <span class="pm-avatar" title="{{ m.user_info.name if m.user_info is defined and m.user_info.name else m.user_id }}">{{ m.user_id[:2]|upper }}</span>
+            {% endfor %}
+            {% if project_members|length > 4 %}
+              <span class="pm-avatar pm-avatar--more">+{{ project_members|length - 4 }}</span>
             {% endif %}
-          </div>
-          <div class="ds-flex ds-items-center ds-gap-1">
-            {% if c_type == 'in_progress' %}
-              <button type="button" class="ds-btn ds-btn-subtle ds-btn-xs" title="{{ t('delete', 'Supprimer la colonne') }}" onclick="deleteKanbanList('{{ lst.id }}')">
-                🗑
-              </button>
-            {% else %}
-              <span class="ds-text-xs ds-text-muted" style="cursor: not-allowed; opacity: 0.5; padding: 4px;" title="{{ t('mandatory_column_hint', 'Colonne obligatoire (non supprimable)') }}">🔒</span>
-            {% endif %}
-          </div>
+          {% endif %}
         </div>
 
-        <!-- Cards List (Drop Target) -->
-        <div class="kanban-card-list" data-list-id="{{ lst.id }}">
-          {% for card in lst.cards %}
-            {% set member_ids = [] %}
-            {% for a in card.assignees %}{% set _ = member_ids.append(a.user_id) %}{% endfor %}
-            {% set label_names = [] %}
-            {% for cl in card.card_labels %}{% if cl.label %}{% set _ = label_names.append(cl.label.name) %}{% endif %}{% endfor %}
+        <button type="button" class="ds-btn ds-btn-secondary ds-btn-sm" onclick="openProjectMembersModal();" title="{{ t('project_members', 'Membres du Projet') }}">
+          {{ ic('groups', 'pm-ic-sm') }} {{ t('project_members', 'Membres') }}
+          <span class="pm-count" id="project-members-count-badge">{{ project_members|length }}</span>
+        </button>
 
-            <div class="kanban-card" data-card-id="{{ card.id }}" data-position="{{ card.position }}" data-priority="{{ card.priority }}" data-members="{{ member_ids|join(',') }}" data-labels="{{ label_names|join(',') }}">
-              {% if card.color_cover %}
-                <div class="kanban-card-cover" style="background-color: {{ card.color_cover }};"></div>
-              {% endif %}
+        <button type="button" class="ds-btn ds-btn-primary ds-btn-sm" onclick="document.getElementById('new-column-modal').classList.add('is-open');">
+          {{ ic('add', 'pm-ic-sm') }} {{ t('add_list', 'Colonne') }}
+        </button>
+      </div>
 
-              <div class="kanban-card-body">
-                <!-- Labels & Epic -->
-                <div class="kanban-card-labels">
-                  {% if card.epic %}
-                    <span class="kanban-label-chip" style="background-color: {{ card.epic.color }}; border-radius: 9999px;">
-                      🏷️ {{ card.epic.title }}
-                    </span>
-                  {% endif %}
-                  {% if card.card_labels and card.card_labels|length > 0 %}
-                    {% for cl in card.card_labels %}
-                      {% if cl.label %}
-                        <span class="kanban-label-chip" style="background-color: {{ cl.label.color }};">
-                          {{ cl.label.name }}
-                        </span>
-                      {% endif %}
-                    {% endfor %}
-                  {% endif %}
-                </div>
+      <!-- Navigation Tabs -->
+      <nav class="pm-tabs" aria-label="{{ t('views', 'Vues') }}">
+        <a href="/admin/melodi_project/board?id={{ board.id }}" class="pm-tab is-active" aria-current="page">
+          {{ ic('view_kanban', 'pm-ic-sm') }} {{ t('kanban_view', 'Kanban') }}
+        </a>
+        <a href="/admin/melodi_project/board/scrum?id={{ board.id }}" class="pm-tab">
+          {{ ic('directions_run', 'pm-ic-sm') }} {{ t('scrum_view', 'Scrum') }}
+        </a>
+        <a href="/admin/melodi_project/board/gantt?id={{ board.id }}" class="pm-tab">
+          {{ ic('view_timeline', 'pm-ic-sm') }} {{ t('gantt_view', 'Gantt') }}
+        </a>
+        <a href="/admin/melodi_project/board/table?id={{ board.id }}" class="pm-tab">
+          {{ ic('table_rows', 'pm-ic-sm') }} {{ t('table_view', 'Table') }}
+        </a>
+      </nav>
+    </header>
 
-                <!-- Title -->
-                <div class="kanban-card-title">{{ card.title }}</div>
+    <!-- ===================== Filter & Search Sub-toolbar ===================== -->
+    <div class="pm-subbar">
+      <div class="pm-toolbar-group">
+        <div class="pm-search">
+          {{ ic('search', 'pm-ic-sm') }}
+          <input type="text" id="kanban-search-input" class="ds-input" placeholder="{{ t('search_placeholder', 'Rechercher...') }}">
+        </div>
 
-                <!-- Badges (Due Date, Checklists, Comments, Assignees, Story Points) -->
-                <div class="kanban-card-badges">
-                  {% if card.is_milestone %}
-                    <span class="kanban-badge-item" style="color: var(--ds-color-warning); font-weight: bold;">◆ {{ t('milestone', 'Jalon') }}</span>
-                  {% endif %}
-                  {% if card.story_points %}
-                    <span class="kanban-badge-item" title="{{ t('story_points', 'Points d\'effort') }}" style="background-color: var(--ds-color-surface-subtle); font-weight: bold;">🎯 {{ card.story_points }} SP</span>
-                  {% endif %}
-                  {% if card.priority == 'urgent' %}
-                    <span class="kanban-badge-item priority-urgent">⚡ {{ t('priority_urgent', 'Urgente') }}</span>
-                  {% endif %}
+        <span class="pm-filter-sep"></span>
 
-                  {% if card.due_date %}
-                    <span class="kanban-badge-item {% if card.is_completed %}is-completed{% else %}is-overdue{% endif %}">
-                      📅 {{ card.due_date.strftime('%d/%m') }}
-                    </span>
-                  {% endif %}
+        <select id="kanban-filter-priority" class="ds-select">
+          <option value="">{{ t('all_priorities', 'Priorités') }}</option>
+          <option value="urgent">{{ t('priority_urgent', 'Urgente') }}</option>
+          <option value="high">{{ t('priority_high', 'Haute') }}</option>
+          <option value="medium">{{ t('priority_medium', 'Moyenne') }}</option>
+          <option value="low">{{ t('priority_low', 'Basse') }}</option>
+        </select>
 
-                  {% set cl_stats = card.checklist_summary %}
-                  {% if cl_stats.total > 0 %}
-                    <span class="kanban-badge-item {% if cl_stats.percent == 100 %}is-completed{% endif %}">
-                      ✓ {{ cl_stats.done }}/{{ cl_stats.total }}
-                    </span>
-                  {% endif %}
+        <select id="kanban-filter-label" class="ds-select">
+          <option value="">{{ t('all_labels', 'Étiquettes') }}</option>
+          {% for lbl in labels %}
+            <option value="{{ lbl.name }}">{{ lbl.name }}</option>
+          {% endfor %}
+        </select>
 
-                  {% if card.comments and card.comments|length > 0 %}
-                    <span class="kanban-badge-item">
-                      💬 {{ card.comments|length }}
-                    </span>
-                  {% endif %}
+        <select id="kanban-filter-member" class="ds-select">
+          <option value="">{{ t('all_members', 'Membres') }}</option>
+          {% for m in project_members %}
+            <option value="{{ m.user_id }}">{{ m.user_info.name if m.user_info is defined and m.user_info.name else m.user_id }}</option>
+          {% endfor %}
+        </select>
+      </div>
 
-                  {% if card.assignees and card.assignees|length > 0 %}
-                    <div class="kanban-card-members">
-                      {% for a in card.assignees %}
-                        <span class="kanban-avatar-chip" title="{{ a.user_id }}">
-                          {{ a.user_id[:2]|upper }}
-                        </span>
-                      {% endfor %}
-                    </div>
-                  {% endif %}
-                </div>
+      <div class="pm-toolbar-group">
+        <select id="kanban-filter-sprint" class="ds-select" onchange="window.location.href='/admin/melodi_project/board?id={{ board.id }}' + (this.value ? '&sprint_id=' + this.value : '');">
+          <option value="">{{ t('all_sprints', 'Tous les Sprints') }}</option>
+          {% for sp in sprints %}
+            <option value="{{ sp.id }}" {% if selected_sprint_id == sp.id %}selected{% endif %}>
+              {{ sp.name }} ({{ sp.status.value }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- ===================== Workspace Body ===================== -->
+    <div class="pm-view-body">
+      {% if selected_sprint %}
+        <div class="pm-banner">
+          <div class="ds-flex ds-items-center ds-gap-2 ds-flex-wrap">
+            <span class="ds-badge ds-badge-primary">{{ ic('directions_run', 'pm-ic-sm') }} {{ selected_sprint.name }}</span>
+            <span class="ds-text-secondary">{{ selected_sprint.start_date.strftime('%d/%m/%Y') }} - {{ selected_sprint.end_date.strftime('%d/%m/%Y') }}</span>
+            <span class="ds-badge ds-badge-secondary">{{ selected_sprint.velocity_achieved }}/{{ selected_sprint.total_story_points }} SP ({{ selected_sprint.progress_percent }}%)</span>
+            {% if selected_sprint.goal %}
+              <span class="ds-text-muted" style="font-style: italic;">— « {{ selected_sprint.goal }} »</span>
+            {% endif %}
+          </div>
+          <a href="/admin/melodi_project/board?id={{ board.id }}" class="ds-btn ds-btn-subtle ds-btn-xs ds-text-danger">
+            {{ ic('close', 'pm-ic-sm') }} {{ t('clear_filter', 'Voir tout le tableau') }}
+          </a>
+        </div>
+      {% endif %}
+
+      <!-- Kanban Canvas (Horizontally Scrollable) -->
+      <div class="kanban-canvas" id="kanban-board-canvas">
+        {% for lst in board.lists %}
+          <div class="kanban-column" data-list-id="{{ lst.id }}">
+            <!-- Column Header -->
+            <div class="kanban-column-header">
+              {% set c_type = lst.column_type.value if lst.column_type.value is defined else lst.column_type %}
+              <div class="kanban-column-title">
+                <span>{{ lst.title }}</span>
+                <span class="kanban-column-badge">{{ lst.cards|length }}</span>
+                {% if c_type == 'entry' %}
+                  <span class="ds-badge ds-badge-subtle ds-badge-xs" title="{{ t('column_type_entry_desc', 'Colonne initiale obligatoire (0%)') }}">{{ t('column_type_entry', 'Début') }}</span>
+                {% elif c_type == 'done' %}
+                  <span class="ds-badge ds-badge-success ds-badge-xs" title="{{ t('column_type_done_desc', 'Colonne de succès obligatoire (100%)') }}">{{ ic('check_circle', 'pm-ic-sm') }} {{ t('column_type_done', 'Fini') }}</span>
+                {% elif c_type == 'cancelled' %}
+                  <span class="ds-badge ds-badge-danger ds-badge-xs" title="{{ t('column_type_cancelled_desc', 'Colonne d\'abandon obligatoire (0%)') }}">{{ t('column_type_cancelled', 'Annulé') }}</span>
+                {% else %}
+                  <span class="ds-badge ds-badge-primary ds-badge-xs" title="{{ t('column_type_in_progress_desc', 'Étape intermédiaire') }}">{{ t('column_type_in_progress', 'En cours') }}</span>
+                {% endif %}
+              </div>
+              <div class="ds-flex ds-items-center ds-gap-1">
+                {% if c_type == 'in_progress' %}
+                  <button type="button" class="pm-icon-btn pm-icon-btn--danger" title="{{ t('delete', 'Supprimer la colonne') }}" onclick="deleteKanbanList('{{ lst.id }}')">
+                    {{ ic('delete', 'pm-ic-sm') }}
+                  </button>
+                {% else %}
+                  <span class="ds-text-xs ds-text-muted" style="cursor: not-allowed; opacity: 0.5; padding: var(--ds-space-1);" title="{{ t('mandatory_column_hint', 'Colonne obligatoire (non supprimable)') }}">
+                    {{ ic('lock', 'pm-ic-sm') }}
+                  </span>
+                {% endif %}
               </div>
             </div>
-          {% endfor %}
-        </div>
 
-        <!-- Column Footer (Inline Card Creator) -->
-        <div class="kanban-column-footer">
-          <button type="button" class="ds-btn ds-btn-subtle ds-btn-xs js-quick-add-btn" style="width: 100%; justify-content: flex-start;">
-            + {{ t('add_card', 'Ajouter une carte') }}
-          </button>
-          <form class="js-quick-add-form ds-hidden" data-board-id="{{ board.id }}" data-list-id="{{ lst.id }}">
-            <input type="text" name="title" required class="ds-input ds-input-xs ds-mb-2" placeholder="{{ t('card_title_placeholder', 'Titre de la carte...') }}">
-            <div class="ds-flex ds-gap-2">
-              <button type="submit" class="ds-btn ds-btn-primary ds-btn-xs">{{ t('add_card', 'Ajouter') }}</button>
-              <button type="button" class="ds-btn ds-btn-subtle ds-btn-xs js-quick-add-cancel">✕</button>
+            <!-- Cards List (Drop Target) -->
+            <div class="kanban-card-list" data-list-id="{{ lst.id }}">
+              {% for card in lst.cards %}
+                {% set member_ids = [] %}
+                {% for a in card.assignees %}{% set _ = member_ids.append(a.user_id) %}{% endfor %}
+                {% set label_names = [] %}
+                {% for cl in card.card_labels %}{% if cl.label %}{% set _ = label_names.append(cl.label.name) %}{% endif %}{% endfor %}
+
+                <div class="kanban-card" data-card-id="{{ card.id }}" data-position="{{ card.position }}" data-priority="{{ card.priority }}" data-members="{{ member_ids|join(',') }}" data-labels="{{ label_names|join(',') }}">
+                  {% if card.color_cover %}
+                    <div class="kanban-card-cover" style="background-color: {{ card.color_cover }};"></div>
+                  {% endif %}
+
+                  <div class="kanban-card-body">
+                    <!-- Labels & Epic -->
+                    <div class="kanban-card-labels">
+                      {% if card.epic %}
+                        <span class="kanban-label-chip" style="background-color: {{ card.epic.color }}; border-radius: var(--ds-radius-full);">
+                          {{ ic('flag', 'pm-ic-sm') }} {{ card.epic.title }}
+                        </span>
+                      {% endif %}
+                      {% if card.card_labels and card.card_labels|length > 0 %}
+                        {% for cl in card.card_labels %}
+                          {% if cl.label %}
+                            <span class="kanban-label-chip" style="background-color: {{ cl.label.color }};">
+                              {{ cl.label.name }}
+                            </span>
+                          {% endif %}
+                        {% endfor %}
+                      {% endif %}
+                    </div>
+
+                    <!-- Title -->
+                    <div class="kanban-card-title">{{ card.title }}</div>
+
+                    <!-- Badges (Due Date, Checklists, Comments, Assignees, Story Points) -->
+                    <div class="kanban-card-badges">
+                      {% if card.is_milestone %}
+                        <span class="kanban-badge-item" style="color: var(--ds-color-warning); font-weight: var(--ds-font-weight-bold);">◆ {{ t('milestone', 'Jalon') }}</span>
+                      {% endif %}
+                      {% if card.story_points %}
+                        <span class="kanban-badge-item" title="{{ t('story_points', 'Points d\'effort') }}" style="background-color: var(--ds-color-surface-subtle); font-weight: var(--ds-font-weight-bold);">{{ card.story_points }} SP</span>
+                      {% endif %}
+                      {% if card.priority == 'urgent' %}
+                        <span class="kanban-badge-item priority-urgent">{{ ic('bolt', 'pm-ic-sm') }} {{ t('priority_urgent', 'Urgente') }}</span>
+                      {% endif %}
+
+                      {% if card.due_date %}
+                        <span class="kanban-badge-item {% if card.is_completed %}is-completed{% else %}is-overdue{% endif %}">
+                          {{ ic('calendar_today', 'pm-ic-sm') }} {{ card.due_date.strftime('%d/%m') }}
+                        </span>
+                      {% endif %}
+
+                      {% set cl_stats = card.checklist_summary %}
+                      {% if cl_stats.total > 0 %}
+                        <span class="kanban-badge-item {% if cl_stats.percent == 100 %}is-completed{% endif %}">
+                          {{ ic('checklist', 'pm-ic-sm') }} {{ cl_stats.done }}/{{ cl_stats.total }}
+                        </span>
+                      {% endif %}
+
+                      {% if card.comments and card.comments|length > 0 %}
+                        <span class="kanban-badge-item">
+                          {{ ic('chat_bubble', 'pm-ic-sm') }} {{ card.comments|length }}
+                        </span>
+                      {% endif %}
+
+                      {% if card.assignees and card.assignees|length > 0 %}
+                        <div class="kanban-card-members">
+                          {% for a in card.assignees %}
+                            <span class="kanban-avatar-chip" title="{{ a.user_id }}">
+                              {{ a.user_id[:2]|upper }}
+                            </span>
+                          {% endfor %}
+                        </div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
             </div>
-          </form>
+
+            <!-- Column Footer (Inline Card Creator) -->
+            <div class="kanban-column-footer">
+              <button type="button" class="ds-btn ds-btn-subtle ds-btn-xs js-quick-add-btn" style="width: 100%; justify-content: flex-start;">
+                {{ ic('add', 'pm-ic-sm') }} {{ t('add_card', 'Ajouter une carte') }}
+              </button>
+              <form class="js-quick-add-form ds-hidden" data-board-id="{{ board.id }}" data-list-id="{{ lst.id }}">
+                <input type="text" name="title" required class="ds-input ds-input-xs ds-mb-2" placeholder="{{ t('card_title_placeholder', 'Titre de la carte...') }}">
+                <div class="ds-flex ds-gap-2">
+                  <button type="submit" class="ds-btn ds-btn-primary ds-btn-xs">{{ t('add_card', 'Ajouter') }}</button>
+                  <button type="button" class="ds-btn ds-btn-subtle ds-btn-xs js-quick-add-cancel">{{ ic('close', 'pm-ic-sm') }}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+
+        <!-- Add List Button Card -->
+        <div style="flex: 0 0 280px;">
+          <button type="button" class="ds-btn ds-btn-outline" style="width: 100%; border-style: dashed; padding: var(--ds-space-4);" onclick="document.getElementById('new-column-modal').classList.add('is-open');">
+            {{ ic('add', 'pm-ic-sm') }} {{ t('add_list', 'Ajouter une autre colonne') }}
+          </button>
         </div>
       </div>
-    {% endfor %}
-
-    <!-- Add List Button Card -->
-    <div style="flex: 0 0 280px;">
-      <button type="button" class="ds-btn ds-btn-outline" style="width: 100%; border-style: dashed; padding: var(--ds-space-4);" onclick="document.getElementById('new-column-modal').classList.add('is-open');">
-        + {{ t('add_list', 'Ajouter une autre colonne') }}
-      </button>
     </div>
+
   </div>
 </div>
 
 <!-- Modal Nouvelle Colonne (Étape Intermédiaire) -->
-<div id="new-column-modal" class="card-modal-backdrop">
+<div id="new-column-modal" class="card-modal-backdrop pm-app">
   <div class="card-modal-container" style="max-width: 440px;">
     <div class="card-modal-header">
       <h3 class="ds-text-md ds-font-bold ds-text-primary" style="margin: 0;">{{ t('add_progress_column', 'Nouvelle Colonne d\'Étape') }}</h3>
-      <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm" onclick="document.getElementById('new-column-modal').classList.remove('is-open');">✕</button>
+      <button type="button" class="pm-icon-btn" onclick="document.getElementById('new-column-modal').classList.remove('is-open');">{{ ic('close', 'pm-ic-md') }}</button>
     </div>
     <form id="create-column-form">
       <div class="ds-p-6">
-        <div class="ds-p-3 ds-rounded-md ds-mb-4" style="background-color: var(--ds-color-surface-subtle); border: 1px solid var(--ds-color-border-subtle);">
-          <div class="ds-flex ds-items-center ds-gap-2 ds-text-xs ds-font-bold ds-text-primary">
-            <span>⏳</span> {{ t('column_type_in_progress', 'Étape intermédiaire') }}
-          </div>
-          <div class="ds-text-xs ds-text-muted ds-mt-1">
+        <div class="pm-modal-intro">
+          {{ ic('view_week', 'pm-ic-md') }}
+          <div>
+            <strong>{{ t('column_type_in_progress', 'Étape intermédiaire') }}</strong>
             {{ t('progress_column_hint', 'Cette colonne sera automatiquement positionnée entre la colonne Début et la colonne Fini.') }}
           </div>
         </div>
-        <div class="ds-mb-4">
-          <label class="ds-label ds-mb-1 ds-font-medium">{{ t('column_title_placeholder', 'Nom de la colonne') }} *</label>
+        <div class="pm-field">
+          <label class="ds-label">{{ t('column_title_placeholder', 'Nom de la colonne') }} <span class="pm-required">*</span></label>
           <input type="text" id="column-title-input" required class="ds-input" placeholder="Ex: En cours, En revue, Tests QA, Validation...">
         </div>
         <input type="hidden" id="column-type-input" value="in_progress">
-        <div class="ds-mb-4">
-          <label class="ds-label ds-mb-1 ds-font-medium">{{ t('wip_limit', 'Limite Work-In-Progress (optionnel)') }}</label>
+        <div class="pm-field" style="margin-bottom: 0;">
+          <label class="ds-label">{{ t('wip_limit', 'Limite Work-In-Progress (optionnel)') }}</label>
           <input type="number" id="column-wip-input" min="1" max="100" class="ds-input" placeholder="Ex: 5 cartes max">
         </div>
       </div>
       <div class="ds-p-4 ds-border-t ds-flex ds-justify-end ds-gap-2" style="background-color: var(--ds-color-surface-subtle);">
-        <button type="button" class="ds-btn ds-btn-subtle" onclick="document.getElementById('new-column-modal').classList.remove('is-open');">{{ t('cancel', 'Annuler') }}</button>
-        <button type="submit" class="ds-btn ds-btn-primary">+ {{ t('create', 'Ajouter l\'étape') }}</button>
+        <button type="button" class="ds-btn ds-btn-secondary" onclick="document.getElementById('new-column-modal').classList.remove('is-open');">{{ t('cancel', 'Annuler') }}</button>
+        <button type="submit" class="ds-btn ds-btn-primary">{{ ic('add', 'pm-ic-sm') }} {{ t('create', 'Ajouter l\'étape') }}</button>
       </div>
     </form>
   </div>
 </div>
 
 <!-- Modal Gestion des Membres du Projet -->
-<div id="project-members-modal" class="card-modal-backdrop">
+<div id="project-members-modal" class="card-modal-backdrop pm-app">
   <div class="card-modal-container" style="max-width: 540px;">
     <div class="card-modal-header">
       <div>
-        <h3 class="ds-text-md ds-font-bold ds-text-primary" style="margin: 0;">👥 {{ t('project_members', 'Membres du Projet') }}</h3>
-        <p class="ds-text-xs ds-text-muted" style="margin: 4px 0 0 0;">{{ t('project_members_desc', 'Gérez les collaborateurs ayant accès à ce projet et pouvant être assignés à ses tâches.') }}</p>
+        <h3 class="ds-text-md ds-font-bold ds-text-primary" style="margin: 0;">{{ ic('groups', 'pm-ic-md') }} {{ t('project_members', 'Membres du Projet') }}</h3>
+        <p class="ds-text-xs ds-text-muted" style="margin: var(--ds-space-1) 0 0 0;">{{ t('project_members_desc', 'Gérez les collaborateurs ayant accès à ce projet et pouvant être assignés à ses tâches.') }}</p>
       </div>
-      <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm" onclick="closeProjectMembersModal();">✕</button>
+      <button type="button" class="pm-icon-btn" onclick="closeProjectMembersModal();">{{ ic('close', 'pm-ic-md') }}</button>
     </div>
 
     <div class="ds-p-6">
       <!-- Section Ajouter un membre -->
       <div class="ds-p-4 ds-rounded-md ds-mb-6" style="background-color: var(--ds-color-surface-subtle); border: 1px solid var(--ds-color-border-subtle);">
-        <label class="ds-label ds-mb-2 ds-font-medium">{{ t('add_project_member', 'Ajouter au projet') }}</label>
+        <label class="ds-label ds-mb-2">{{ t('add_project_member', 'Ajouter au projet') }}</label>
         <form id="add-project-member-form" class="ds-flex ds-gap-2">
           <select id="new-member-user-id" class="ds-select ds-select-sm" style="flex: 1;" required>
             <option value="">{{ t('select_user_to_add', 'Sélectionner un collaborateur...') }}</option>
           </select>
-          <select id="new-member-role" class="ds-select ds-select-sm" style="width: 120px;">
+          <select id="new-member-role" class="ds-select ds-select-sm" style="width: 130px;">
             <option value="member">{{ t('role_member', 'Membre') }}</option>
             <option value="admin">{{ t('role_admin', 'Gestionnaire') }}</option>
             <option value="viewer">{{ t('role_viewer', 'Observateur') }}</option>
           </select>
-          <button type="submit" class="ds-btn ds-btn-primary ds-btn-sm">+ {{ t('create', 'Ajouter') }}</button>
+          <button type="submit" class="ds-btn ds-btn-primary ds-btn-sm">{{ ic('person_add', 'pm-ic-sm') }} {{ t('create', 'Ajouter') }}</button>
         </form>
       </div>
 
@@ -300,24 +340,23 @@
     </div>
 
     <div class="ds-p-4 ds-border-t ds-flex ds-justify-end" style="background-color: var(--ds-color-surface-subtle);">
-      <button type="button" class="ds-btn ds-btn-subtle" onclick="closeProjectMembersModal();">{{ t('close', 'Fermer') }}</button>
+      <button type="button" class="ds-btn ds-btn-secondary" onclick="closeProjectMembersModal();">{{ t('close', 'Fermer') }}</button>
     </div>
   </div>
 </div>
 
 <!-- Reusable Card Detail Modal -->
-<!-- Modal de détail de carte Trello-Style -->
-<div id="card-detail-modal" class="card-modal-backdrop">
+<div id="card-detail-modal" class="card-modal-backdrop pm-app">
   <div class="card-modal-container">
     <div class="card-modal-header">
       <div style="flex: 1;">
         <div class="ds-flex ds-items-center ds-gap-2 ds-mb-1">
           <span id="modal-card-priority" class="ds-badge ds-badge-primary">NORMAL</span>
-          <span class="ds-text-xs ds-text-muted">Échéance: <strong id="modal-card-due-date">-</strong></span>
+          <span class="ds-text-xs ds-text-muted">{{ t('due_date', 'Échéance') }}: <strong id="modal-card-due-date">-</strong></span>
         </div>
         <h3 id="modal-card-title" class="ds-text-lg ds-font-bold ds-text-primary" style="margin: 0;"></h3>
       </div>
-      <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm js-close-modal" title="{{ t('close', 'Fermer') }}">✕</button>
+      <button type="button" class="pm-icon-btn js-close-modal" title="{{ t('close', 'Fermer') }}">{{ ic('close', 'pm-ic-md') }}</button>
     </div>
 
     <div class="card-modal-body">
@@ -338,7 +377,7 @@
         <!-- Description -->
         <div class="ds-mb-6">
           <div class="card-modal-section-title">
-            <span>📝</span> {{ t('board_description', 'Description') }}
+            {{ ic('edit', 'pm-ic-sm') }} {{ t('board_description', 'Description') }}
           </div>
           <div id="modal-card-desc" class="ds-p-3 ds-border ds-rounded-md ds-text-sm" style="background-color: var(--ds-color-surface-subtle); white-space: pre-wrap; min-height: 60px;"></div>
         </div>
@@ -351,7 +390,7 @@
         <!-- Comments & Activity -->
         <div class="ds-mb-4">
           <div class="card-modal-section-title">
-            <span>💬</span> {{ t('comments', 'Commentaires') }}
+            {{ ic('chat_bubble', 'pm-ic-sm') }} {{ t('comments', 'Commentaires') }}
           </div>
           <form id="modal-comment-form" class="ds-mb-3">
             <textarea class="ds-textarea ds-mb-2" rows="2" placeholder="{{ t('add_comment', 'Écrire un commentaire...') }}" required style="width: 100%;"></textarea>
@@ -366,13 +405,13 @@
         <div class="ds-text-xs ds-font-bold ds-text-muted ds-mb-2" style="text-transform: uppercase;">{{ t('actions', 'Actions') }}</div>
         <div class="ds-flex ds-flex-col ds-gap-2">
           <button type="button" id="js-toggle-complete-card" class="ds-btn ds-btn-outline ds-btn-sm" style="width: 100%; justify-content: flex-start;">
-            ✓ {{ t('mark_completed', 'Terminer / Rouvrir') }}
+            {{ ic('check_circle', 'pm-ic-sm') }} {{ t('mark_completed', 'Terminer / Rouvrir') }}
           </button>
           <button type="button" id="js-add-checklist-trigger" class="ds-btn ds-btn-outline ds-btn-sm" style="width: 100%; justify-content: flex-start;">
-            ☑ {{ t('add_checklist', 'Ajouter une checklist') }}
+            {{ ic('checklist', 'pm-ic-sm') }} {{ t('add_checklist', 'Ajouter une checklist') }}
           </button>
           <button type="button" id="js-delete-card-trigger" class="ds-btn ds-btn-danger ds-btn-sm" style="width: 100%; justify-content: flex-start; margin-top: var(--ds-space-4);">
-            🗑 {{ t('delete', 'Supprimer la carte') }}
+            {{ ic('delete', 'pm-ic-sm') }} {{ t('delete', 'Supprimer la carte') }}
           </button>
         </div>
       </div>
@@ -446,7 +485,7 @@
     if (container) {
       container.innerHTML = '';
       if (members.length === 0) {
-        container.innerHTML = '<div class="ds-text-muted ds-text-xs ds-p-3">Aucun membre</div>';
+        container.innerHTML = '<div class="ds-text-muted ds-text-xs ds-p-3">{{ t("no_members", "Aucun membre") }}</div>';
         return;
       }
 
@@ -459,20 +498,20 @@
         let roleLabel = '{{ t("role_member", "Membre") }}';
         if (m.role === 'owner') {
           roleBadgeClass = 'ds-badge-primary';
-          roleLabel = '👑 {{ t("role_owner", "Propriétaire") }}';
+          roleLabel = '{{ t("role_owner", "Propriétaire") }}';
         } else if (m.role === 'admin') {
           roleBadgeClass = 'ds-badge-warning';
-          roleLabel = '⚡ {{ t("role_admin", "Gestionnaire") }}';
+          roleLabel = '{{ t("role_admin", "Gestionnaire") }}';
         } else if (m.role === 'viewer') {
           roleBadgeClass = 'ds-badge-secondary';
-          roleLabel = '👁 {{ t("role_viewer", "Observateur") }}';
+          roleLabel = '{{ t("role_viewer", "Observateur") }}';
         }
 
         const canRemove = members.length > 1;
 
         item.innerHTML = `
           <div class="ds-flex ds-items-center ds-gap-2">
-            <span class="kanban-avatar-chip" style="width: 28px; height: 28px; font-size: 0.75rem;">
+            <span class="kanban-avatar-chip" style="width: 28px; height: 28px; font-size: var(--ds-font-size-xs); margin-left: 0;">
               ${(m.user_id || 'U').substring(0, 2).toUpperCase()}
             </span>
             <div>
@@ -483,11 +522,11 @@
           <div class="ds-flex ds-items-center ds-gap-2">
             <span class="ds-badge ${roleBadgeClass} ds-text-xs">${roleLabel}</span>
             ${canRemove ? `
-              <button type="button" class="ds-btn ds-btn-subtle ds-btn-xs" style="color: var(--ds-color-danger, #ef4444);" onclick="removeProjectMember('${m.user_id}')" title="{{ t('remove_project_member', 'Retirer du projet') }}">
+              <button type="button" class="pm-icon-btn pm-icon-btn--danger" onclick="removeProjectMember('${m.user_id}')" title="{{ t('remove_project_member', 'Retirer du projet') }}">
                 ✕
               </button>
             ` : `
-              <span class="ds-text-muted ds-text-xs" title="Dernier membre">(Requis)</span>
+              <span class="ds-text-muted ds-text-xs" title="{{ t('required_member', 'Dernier membre') }}">({{ t('required', 'Requis') }})</span>
             `}
           </div>
         `;

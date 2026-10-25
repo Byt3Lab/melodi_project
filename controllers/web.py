@@ -92,6 +92,10 @@ class ProjectWebController:
                         board_id = str(form.get("board_id"))
                         await BoardService.archive_board(session, board_id, user_id=current_user.get("user_id"))
                         await session.commit()
+                    elif action_type == "unarchive_board":
+                        board_id = str(form.get("board_id"))
+                        await BoardService.unarchive_board(session, board_id, user_id=current_user.get("user_id"))
+                        await session.commit()
                     elif action_type == "delete_board":
                         board_id = str(form.get("board_id"))
                         await BoardService.delete_board(session, board_id)
@@ -125,6 +129,8 @@ class ProjectWebController:
             "search_query": search or "",
             "current_user": current_user,
         })
+        content.require_css("/static/melodi_project/css/kanban.css", priority=20)
+        content.require_css("/static/melodi_project/css/project.css", priority=30)
         page = Page("Gestion de Projets & Tableaux", admin_layout(content))
         return await response.render_page(page)
 
@@ -175,6 +181,8 @@ class ProjectWebController:
             "selected_sprint": selected_sprint,
             "current_user": current_user,
         })
+        content.require_css("/static/melodi_project/css/kanban.css", priority=20)
+        content.require_css("/static/melodi_project/css/project.css", priority=30)
         page = Page(f"{board.title} - Tableau Kanban", admin_layout(content))
         return await response.render_page(page)
 
@@ -213,6 +221,8 @@ class ProjectWebController:
             "users_map": users_map,
             "current_user": current_user,
         })
+        content.require_css("/static/melodi_project/css/kanban.css", priority=20)
+        content.require_css("/static/melodi_project/css/project.css", priority=30)
         page = Page(f"{board.title} - Vue Liste & Synthèse", admin_layout(content))
         return await response.render_page(page)
 
@@ -280,6 +290,8 @@ class ProjectWebController:
             "users_map": users_map,
             "current_user": current_user,
         })
+        content.require_css("/static/melodi_project/css/kanban.css", priority=20)
+        content.require_css("/static/melodi_project/css/project.css", priority=30)
         page = Page(f"{board.title} - Scrum & Sprints", admin_layout(content))
         return await response.render_page(page)
 
@@ -314,6 +326,9 @@ class ProjectWebController:
             "users_map": users_map,
             "current_user": current_user,
         })
+        content.require_css("/static/melodi_project/css/kanban.css", priority=20)
+        content.require_css("/static/melodi_project/css/gantt.css", priority=25)
+        content.require_css("/static/melodi_project/css/project.css", priority=30)
         page = Page(f"{board.title} - Diagramme de Gantt", admin_layout(content))
         return await response.render_page(page)
 

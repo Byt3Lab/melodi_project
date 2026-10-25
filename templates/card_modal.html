@@ -1,27 +1,31 @@
-<!-- Modal de détail de carte Trello-Style -->
-<div id="card-detail-modal" class="card-modal-backdrop">
+{% macro ic(name, cls='') -%}
+<span class="pm-ic {{ cls }}" style="--pm-icon: url('/static_base_icons?name={{ name }}')" aria-hidden="true"></span>
+{%- endmacro %}
+
+<!-- Modal de détail de carte -->
+<div id="card-detail-modal" class="card-modal-backdrop pm-app">
   <div class="card-modal-container">
     <div class="card-modal-header">
       <div style="flex: 1;">
         <div class="ds-flex ds-items-center ds-gap-2 ds-mb-1">
           <span id="modal-card-priority" class="ds-badge ds-badge-primary">NORMAL</span>
-          <span class="ds-text-xs ds-text-muted">Échéance: <strong id="modal-card-due-date">-</strong></span>
+          <span class="ds-text-xs ds-text-muted">{{ t('due_date', 'Échéance') }}: <strong id="modal-card-due-date">-</strong></span>
         </div>
         <h3 id="modal-card-title" class="ds-text-lg ds-font-bold ds-text-primary" style="margin: 0;"></h3>
       </div>
-      <button type="button" class="ds-btn ds-btn-subtle ds-btn-sm js-close-modal" title="{{ t('close', 'Fermer') }}">✕</button>
+      <button type="button" class="pm-icon-btn js-close-modal" title="{{ t('close', 'Fermer') }}">{{ ic('close', 'pm-ic-md') }}</button>
     </div>
 
     <div class="card-modal-body">
       <!-- Main Column -->
       <div>
         <!-- Scrum & Gantt Context Row -->
-        <div class="ds-flex ds-items-center ds-gap-2 ds-mb-3 ds-p-2 ds-border ds-rounded-md" style="background-color: var(--ds-color-surface-subtle); font-size: 0.8rem;">
-          <span id="modal-card-sprint-badge" class="ds-badge ds-badge-subtle">🏃 Backlog</span>
+        <div class="ds-flex ds-items-center ds-gap-2 ds-mb-3 ds-p-2 ds-border ds-rounded-md" style="background-color: var(--ds-color-surface-subtle); font-size: var(--ds-font-size-xs);">
+          <span id="modal-card-sprint-badge" class="ds-badge ds-badge-subtle">Backlog</span>
           <span id="modal-card-epic-badge" class="ds-badge ds-badge-subtle" style="display: none;"></span>
           <span id="modal-card-sp-badge" class="ds-badge ds-badge-secondary" style="display: none;"></span>
-          <span id="modal-card-milestone-badge" class="ds-badge ds-badge-warning" style="display: none;">🔶 Jalon</span>
-          <span class="ds-text-muted" style="margin-left: auto;">Avancement: <strong id="modal-card-progress">0%</strong></span>
+          <span id="modal-card-milestone-badge" class="ds-badge ds-badge-warning" style="display: none;">◆ {{ t('milestone', 'Jalon') }}</span>
+          <span class="ds-text-muted" style="margin-left: auto;">{{ t('progress_label', 'Progression') }}: <strong id="modal-card-progress">0%</strong></span>
         </div>
 
         <!-- Labels & Members Quick summary -->
@@ -39,7 +43,7 @@
         <!-- Description -->
         <div class="ds-mb-6">
           <div class="card-modal-section-title">
-            <span>📝</span> {{ t('board_description', 'Description') }}
+            {{ ic('edit', 'pm-ic-sm') }} {{ t('board_description', 'Description') }}
           </div>
           <div id="modal-card-desc" class="ds-p-3 ds-border ds-rounded-md ds-text-sm" style="background-color: var(--ds-color-surface-subtle); white-space: pre-wrap; min-height: 60px;"></div>
         </div>
@@ -52,7 +56,7 @@
         <!-- Comments & Activity -->
         <div class="ds-mb-4">
           <div class="card-modal-section-title">
-            <span>💬</span> {{ t('comments', 'Commentaires') }}
+            {{ ic('chat_bubble', 'pm-ic-sm') }} {{ t('comments', 'Commentaires') }}
           </div>
           <form id="modal-comment-form" class="ds-mb-3">
             <textarea class="ds-textarea ds-mb-2" rows="2" placeholder="{{ t('add_comment', 'Écrire un commentaire...') }}" required style="width: 100%;"></textarea>
@@ -67,13 +71,13 @@
         <div class="ds-text-xs ds-font-bold ds-text-muted ds-mb-2" style="text-transform: uppercase;">{{ t('actions', 'Actions') }}</div>
         <div class="ds-flex ds-flex-col ds-gap-2">
           <button type="button" id="js-toggle-complete-card" class="ds-btn ds-btn-outline ds-btn-sm" style="width: 100%; justify-content: flex-start;">
-            ✓ {{ t('mark_completed', 'Terminer / Rouvrir') }}
+            {{ ic('check_circle', 'pm-ic-sm') }} {{ t('mark_completed', 'Terminer / Rouvrir') }}
           </button>
           <button type="button" id="js-add-checklist-trigger" class="ds-btn ds-btn-outline ds-btn-sm" style="width: 100%; justify-content: flex-start;">
-            ☑ {{ t('add_checklist', 'Ajouter une checklist') }}
+            {{ ic('checklist', 'pm-ic-sm') }} {{ t('add_checklist', 'Ajouter une checklist') }}
           </button>
           <button type="button" id="js-delete-card-trigger" class="ds-btn ds-btn-danger ds-btn-sm" style="width: 100%; justify-content: flex-start; margin-top: var(--ds-space-4);">
-            🗑 {{ t('delete', 'Supprimer la carte') }}
+            {{ ic('delete', 'pm-ic-sm') }} {{ t('delete', 'Supprimer la carte') }}
           </button>
         </div>
       </div>

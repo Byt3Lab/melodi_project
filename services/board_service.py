@@ -157,6 +157,18 @@ class BoardService:
         return board
 
     @staticmethod
+    async def unarchive_board(session: AsyncSession, board_id: str, user_id: str = "system") -> Optional[BoardModel]:
+        board = await BoardRepository.update_board(session, str(board_id), is_archived=False)
+        if board:
+            await ActivityService.log_activity(
+                session=session,
+                board_id=board.id,
+                user_id=user_id,
+                action_type="board_unarchived"
+            )
+        return board
+
+    @staticmethod
     async def delete_board(session: AsyncSession, board_id: str) -> bool:
         return await BoardRepository.delete_board(session, str(board_id))
 
