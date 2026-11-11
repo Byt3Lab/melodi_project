@@ -183,7 +183,7 @@ class BoardMemberModel(BaseModel):
     board: Mapped["BoardModel"] = relationship("BoardModel", back_populates="members")
 
     __table_args__ = (
-        UniqueConstraint("board_id", "user_id", name="uq_melodi_project_board_member"),
+        UniqueConstraint("board_id", "user_id", name=f"uq_{ProjectTables.BOARD_MEMBERS}_board_user"),
     )
 
     def to_dict(self) -> dict:
@@ -561,7 +561,7 @@ class TaskDependencyModel(BaseModel):
     successor: Mapped["CardModel"] = relationship("CardModel", foreign_keys=[successor_id], back_populates="predecessor_links")
 
     __table_args__ = (
-        Index("idx_dep_pred_succ", "predecessor_id", "successor_id", unique=True),
+        Index(f"idx_{ProjectTables.CARD_DEPENDENCIES}_pred_succ", "predecessor_id", "successor_id", unique=True),
     )
 
     def to_dict(self) -> dict:
@@ -610,7 +610,7 @@ class SprintDependencyModel(BaseModel):
     successor_sprint: Mapped["SprintModel"] = relationship("SprintModel", foreign_keys=[successor_sprint_id])
 
     __table_args__ = (
-        Index("idx_sprint_dep_pred_succ", "predecessor_sprint_id", "successor_sprint_id", unique=True),
+        Index(f"idx_{ProjectTables.SPRINT_DEPENDENCIES}_pred_succ", "predecessor_sprint_id", "successor_sprint_id", unique=True),
     )
 
     def to_dict(self) -> dict:
